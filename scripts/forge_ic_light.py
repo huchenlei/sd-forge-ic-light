@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from modules import scripts, script_callbacks
 from modules.ui_components import InputAccordion
-from modules.processing import StableDiffusionProcessing
+from modules.processing import StableDiffusionProcessing, StableDiffusionProcessingTxt2Img
 from modules.paths import models_path
 from ldm_patched.modules.utils import load_torch_file
 from ldm_patched.modules.model_patcher import ModelPatcher
@@ -18,6 +18,7 @@ from ldm_patched.modules.sd import VAE
 from libiclight.ic_light_nodes import ICLight
 from libiclight.briarmbg import BriaRMBG
 from libiclight.utils import (
+    align_dim_latent,
     run_rmbg,
     resize_and_center_crop,
     forge_numpy2pytorch,
@@ -169,8 +170,20 @@ class ICLightArgs(BaseModel):
         p: StableDiffusionProcessing,
         device: torch.device,
     ) -> dict:
-        image_width = p.width
-        image_height = p.height
+        is_hr_pass = getattr(p, 'is_hr_pass', False)
+        if is_hr_pass:
+            assert isinstance(p, StableDiffusionProcessingTxt2Img)
+            # TODO: Move the calculation to Forge main repo.
+            if p.hr_resize_x == 0 and p.hr_resize_y == 0:
+                hr_x = int(p.width * p.hr_scale)
+                hr_y = int(p.height * p.hr_scale)
+            else:
+                hr_y, hr_x = p.hr_resize_y, p.hr_resize_x
+            image_width = align_dim_latent(hr_x)
+            image_height = align_dim_latent(hr_y)
+        else:
+            image_width = p.width
+            image_height = p.height
 
         fg = resize_and_center_crop(processed_fg, image_width, image_height)
         if self.model_type == ModelType.FC:
