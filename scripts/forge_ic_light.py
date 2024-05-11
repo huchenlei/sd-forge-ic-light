@@ -1,3 +1,4 @@
+import os
 import torch
 import gradio as gr
 import numpy as np
@@ -5,17 +6,15 @@ from enum import Enum
 from typing import Optional, Tuple
 from pydantic import BaseModel
 
-
-from ldm_patched.modules.model_patcher import ModelPatcher
 from modules import scripts
 from modules.ui_components import InputAccordion
 from modules.processing import (
     StableDiffusionProcessing,
     StableDiffusionProcessingImg2Img,
 )
-from ldm_patched.utils import path_utils as folder_paths
-from ldm_patched.modules.sd import load_unet
-from ldm_patched.modules import latent_formats
+from modules.paths import models_path
+from ldm_patched.modules.utils import load_torch_file
+from ldm_patched.modules.model_patcher import ModelPatcher
 
 from libiclight.ic_light_nodes import ICLight
 from libiclight.briarmbg import BriaRMBG
@@ -88,7 +87,7 @@ class BGSourceFBC(Enum):
             assert uploaded_bg is not None
             input_bg = uploaded_bg
         elif bg_source == BGSourceFBC.UPLOAD_FLIP:
-            input_bg = np.fliplr(input_bg)
+            input_bg = np.fliplr(uploaded_bg)
         elif bg_source == BGSourceFBC.GREY:
             input_bg = (
                 np.zeros(shape=(image_height, image_width, 3), dtype=np.uint8) + 64
@@ -144,7 +143,7 @@ class ICLightArgs(BaseModel):
         vae: ModelPatcher,
         p: StableDiffusionProcessing,
         device: torch.device,
-    ) -> torch.Tensor:
+    ) -> dict:
         image_width = p.width
         image_height = p.height
 
@@ -162,10 +161,13 @@ class ICLightArgs(BaseModel):
             )
             np_concat = [fg, bg]
 
-        concat_conds = numpy2pytorch(np_concat).to(device=vae.device, dtype=vae.dtype)
-        concat_conds = vae.encode(concat_conds) * latent_formats.SD15().scale_factor
+        concat_conds = numpy2pytorch(np_concat).to(device=device, dtype=torch.float16)
+        # [B, C, H, W] => [B, H, W, C] so that vae.encode can convert it back correctly
+        # to [B, C, H, W]
+        concat_conds = concat_conds.movedim(1, -1)
+        concat_conds = vae.encode(concat_conds)
         concat_conds = torch.cat([c[None, ...] for c in concat_conds], dim=1)
-        return concat_conds
+        return {"samples": concat_conds}
 
 
 class ICLightForge(scripts.Script):
@@ -192,11 +194,12 @@ class ICLightForge(scripts.Script):
                     height=480,
                 )
 
+            model_type_value = ModelType.FC.value if is_img2img else ModelType.FBC.value
             model_type = gr.Dropdown(
-                visible=False,
-                choices=[e.value for e in ModelType],
+                visible=True,
+                choices=[model_type_value],
                 label="Model",
-                value=ModelType.FC.value if is_img2img else ModelType.FBC.value,
+                value=model_type_value,
             )
 
             bg_source_fc = gr.Radio(
@@ -241,24 +244,18 @@ class ICLightForge(scripts.Script):
             return
 
         device = torch.device("cuda")
-        rmbg = BriaRMBG.from_pretrained("briaai/RMBG-1.4")
+        rmbg = BriaRMBG.from_pretrained("briaai/RMBG-1.4").to(device=device)
 
         work_model: ModelPatcher = p.sd_model.forge_objects.unet.clone()
         vae: ModelPatcher = p.sd_model.forge_objects.vae.clone()
-        unet_path = folder_paths.get_full_path("unet", args.model_type.model_name)
-        ic_model: ModelPatcher = load_unet(unet_path)
+        unet_path = os.path.join(models_path, "unet", args.model_type.model_name)
+        ic_model_state_dict = load_torch_file(unet_path, device=device)
         node = ICLight()
 
         patched_unet: ModelPatcher = node.apply(
             model=work_model,
-            ic_model=ic_model,
-            c_concat=args.get_c_concat(
-                rmbg,
-                vae,
-                image_width=p.width,
-                image_height=p.height,
-                device=device,
-            ),
+            ic_model_state_dict=ic_model_state_dict,
+            c_concat=args.get_c_concat(rmbg, vae, p, device=device),
         )[0]
 
         p.sd_model.forge_objects.unet = patched_unet

@@ -33,7 +33,7 @@ class ICLight:
     def apply(
         self,
         model: ModelPatcher,
-        ic_model: ModelPatcher,
+        ic_model_state_dict: dict,
         c_concat: dict,
     ) -> Tuple[ModelPatcher]:
         device = model_management.get_torch_device()
@@ -75,7 +75,6 @@ class ICLight:
 
         work_model.set_model_unet_function_wrapper(wrapper_func)
 
-        ic_model_state_dict = ic_model.model.diffusion_model.state_dict()
         work_model.add_patches(
             patches={
                 ("diffusion_model." + key): (value.to(dtype=dtype, device=device),)
