@@ -149,8 +149,7 @@ class ICLightArgs(BaseModel):
         image_height = p.height
 
         fg = resize_and_center_crop(processed_fg, image_width, image_height)
-        if isinstance(p, StableDiffusionProcessingImg2Img):
-            assert self.model_type == ModelType.FC
+        if self.model_type == ModelType.FC:
             np_concat = [fg]
         else:
             assert self.model_type == ModelType.FBC
@@ -183,6 +182,15 @@ class ICLightForge(scripts.Script):
         return scripts.AlwaysVisible
 
     def ui(self, is_img2img: bool) -> Tuple[gr.components.Component, ...]:
+        if is_img2img:
+            model_type_choices = [ModelType.FC.value]
+            model_type_value = ModelType.FC.value
+            bg_source_fc_choices = [e.value for e in BGSourceFC if e != BGSourceFC.NONE]
+        else:
+            model_type_choices = [ModelType.FC.value, ModelType.FBC.value]
+            model_type_value = ModelType.FBC.value
+            bg_source_fc_choices = [BGSourceFC.NONE.value]
+
         with InputAccordion(value=False, label=self.title()) as enabled:
             with gr.Row():
                 input_fg = gr.Image(
@@ -195,32 +203,33 @@ class ICLightForge(scripts.Script):
                     height=480,
                 )
 
-            model_type_value = ModelType.FC.value if is_img2img else ModelType.FBC.value
             model_type = gr.Dropdown(
-                visible=True,
-                choices=[model_type_value],
                 label="Model",
+                choices=model_type_choices,
                 value=model_type_value,
+                interactive=True,
             )
 
             bg_source_fc = gr.Radio(
-                choices=[e.value for e in BGSourceFC],
-                value=BGSourceFC.NONE.value,
                 label="Background Source",
+                choices=bg_source_fc_choices,
+                value=BGSourceFC.NONE.value,
                 type="value",
                 visible=is_img2img,
+                interactive=True,
             )
 
             bg_source_fbc = gr.Radio(
-                choices=[e.value for e in BGSourceFBC],
-                value=BGSourceFC.NONE.value,
                 label="Background Source",
+                choices=[e.value for e in BGSourceFBC],
+                value=BGSourceFBC.UPLOAD.value,
                 type="value",
                 visible=not is_img2img,
+                interactive=True,
             )
 
         # TODO return a dict here so that API calls are cleaner.
-        return (
+        states = (
             enabled,
             model_type,
             input_fg,
@@ -228,6 +237,23 @@ class ICLightForge(scripts.Script):
             bg_source_fc,
             bg_source_fbc,
         )
+
+        def on_model_type_change(model_type: str):
+            model_type = ModelType(model_type)
+            if model_type == ModelType.FC:
+                return gr.update(visible=True), gr.update(visible=False)
+            else:
+                assert model_type == ModelType.FBC
+                return gr.update(visible=False), gr.update(visible=True)
+
+        model_type.change(
+            fn=on_model_type_change,
+            inputs=[model_type],
+            outputs=[bg_source_fc, bg_source_fbc],
+            show_progress=False,
+        )
+
+        return states
 
     def process_before_every_sampling(
         self, p: StableDiffusionProcessing, *script_args, **kwargs
