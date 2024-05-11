@@ -15,13 +15,14 @@ from modules.processing import (
 from modules.paths import models_path
 from ldm_patched.modules.utils import load_torch_file
 from ldm_patched.modules.model_patcher import ModelPatcher
+from ldm_patched.modules.sd import VAE
 
 from libiclight.ic_light_nodes import ICLight
 from libiclight.briarmbg import BriaRMBG
 from libiclight.utils import (
     run_rmbg,
     resize_and_center_crop,
-    numpy2pytorch,
+    forge_numpy2pytorch,
 )
 
 
@@ -139,16 +140,15 @@ class ICLightArgs(BaseModel):
 
     def get_c_concat(
         self,
-        rmbg,
-        vae: ModelPatcher,
+        processed_fg: np.ndarray,  # fg with bg removed.
+        vae: VAE,
         p: StableDiffusionProcessing,
         device: torch.device,
     ) -> dict:
         image_width = p.width
         image_height = p.height
 
-        input_fg, _ = run_rmbg(rmbg, img=self.input_fg, device=device)
-        fg = resize_and_center_crop(input_fg, image_width, image_height)
+        fg = resize_and_center_crop(processed_fg, image_width, image_height)
         if isinstance(p, StableDiffusionProcessingImg2Img):
             assert self.model_type == ModelType.FC
             np_concat = [fg]
@@ -161,13 +161,14 @@ class ICLightArgs(BaseModel):
             )
             np_concat = [fg, bg]
 
-        concat_conds = numpy2pytorch(np_concat).to(device=device, dtype=torch.float16)
-        # [B, C, H, W] => [B, H, W, C] so that vae.encode can convert it back correctly
-        # to [B, C, H, W]
-        concat_conds = concat_conds.movedim(1, -1)
-        concat_conds = vae.encode(concat_conds)
-        concat_conds = torch.cat([c[None, ...] for c in concat_conds], dim=1)
-        return {"samples": concat_conds}
+        concat_conds = forge_numpy2pytorch(np.stack(np_concat, axis=0)).to(
+            device=device, dtype=torch.float16
+        )
+
+        # Optional: Use mode instead of sample from VAE output.
+        # vae.first_stage_model.regularization.sample = False
+        latent_concat_conds = vae.encode(concat_conds)
+        return {"samples": latent_concat_conds}
 
 
 class ICLightForge(scripts.Script):
@@ -245,6 +246,10 @@ class ICLightForge(scripts.Script):
 
         device = torch.device("cuda")
         rmbg = BriaRMBG.from_pretrained("briaai/RMBG-1.4").to(device=device)
+        alpha = run_rmbg(rmbg, img=args.input_fg, device=device)
+        input_rgb: np.ndarray = (
+            (args.input_fg.astype(np.float32) * alpha).astype(np.uint8).clip(0, 255)
+        )
 
         work_model: ModelPatcher = p.sd_model.forge_objects.unet.clone()
         vae: ModelPatcher = p.sd_model.forge_objects.vae.clone()
@@ -255,7 +260,7 @@ class ICLightForge(scripts.Script):
         patched_unet: ModelPatcher = node.apply(
             model=work_model,
             ic_model_state_dict=ic_model_state_dict,
-            c_concat=args.get_c_concat(rmbg, vae, p, device=device),
+            c_concat=args.get_c_concat(input_rgb, vae, p, device=device),
         )[0]
 
         p.sd_model.forge_objects.unet = patched_unet

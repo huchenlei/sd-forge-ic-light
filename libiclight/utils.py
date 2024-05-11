@@ -29,6 +29,11 @@ def numpy2pytorch(imgs):
     return h
 
 
+def forge_numpy2pytorch(img: np.ndarray) -> torch.Tensor:
+    """Note: Forge/ComfyUI's VAE accepts 0 ~ 1 tensors."""
+    return torch.from_numpy(img.astype(np.float32) / 255.0)
+
+
 def resize_and_center_crop(image, target_width, target_height):
     pil_image = Image.fromarray(image)
     original_width, original_height = pil_image.size
@@ -51,7 +56,7 @@ def resize_without_crop(image, target_width, target_height):
 
 
 @torch.inference_mode()
-def run_rmbg(rmbg, img, sigma=0.0, device=torch.device("cuda")):
+def run_rmbg(rmbg, img, device=torch.device("cuda")) -> np.ndarray:
     H, W, C = img.shape
     assert C == 3
     k = (256.0 / float(H * W)) ** 0.5
@@ -61,5 +66,4 @@ def run_rmbg(rmbg, img, sigma=0.0, device=torch.device("cuda")):
     alpha = torch.nn.functional.interpolate(alpha, size=(H, W), mode="bilinear")
     alpha = alpha.movedim(1, -1)[0]
     alpha = alpha.detach().float().cpu().numpy().clip(0, 1)
-    result = 127 + (img.astype(np.float32) - 127 + sigma) * alpha
-    return result.clip(0, 255).astype(np.uint8), alpha
+    return alpha
