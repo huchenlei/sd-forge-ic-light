@@ -209,11 +209,9 @@ class ICLightForge(scripts.Script):
     def ui(self, is_img2img: bool) -> Tuple[gr.components.Component, ...]:
         if is_img2img:
             model_type_choices = [ModelType.FC.value]
-            model_type_value = ModelType.FC.value
             bg_source_fc_choices = [e.value for e in BGSourceFC if e != BGSourceFC.NONE]
         else:
             model_type_choices = [ModelType.FC.value, ModelType.FBC.value]
-            model_type_value = ModelType.FBC.value
             bg_source_fc_choices = [BGSourceFC.NONE.value]
 
         with InputAccordion(value=False, label=self.title()) as enabled:
@@ -233,7 +231,7 @@ class ICLightForge(scripts.Script):
             model_type = gr.Dropdown(
                 label="Model",
                 choices=model_type_choices,
-                value=model_type_value,
+                value=ModelType.FC.value,
                 interactive=True,
             )
 
@@ -242,7 +240,7 @@ class ICLightForge(scripts.Script):
                 choices=bg_source_fc_choices,
                 value=BGSourceFC.NONE.value,
                 type="value",
-                visible=is_img2img,
+                visible=True,
                 interactive=True,
             )
 
@@ -251,7 +249,7 @@ class ICLightForge(scripts.Script):
                 choices=[e.value for e in BGSourceFBC],
                 value=BGSourceFBC.UPLOAD.value,
                 type="value",
-                visible=not is_img2img,
+                visible=False,
                 interactive=True,
             )
 
