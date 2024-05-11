@@ -16,7 +16,7 @@ After you download these models, please put them under `stable-diffusion-webui-f
 ## How to use
 For best result, it is recommended to use low CFG and strong denosing strength.
 
-### Given FG, Generate BG and relight [Txt2Img][HR availble]
+### Given FG, Generate BG and relight [Txt2Img][HR available]
 ![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/00fbae46-b5cf-4415-89ac-5b23b1a8f463)
 
 ### Given FG and light map, Genereate BG and relight [Img2Img]
