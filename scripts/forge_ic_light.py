@@ -21,10 +21,8 @@ from libiclight.ic_light_nodes import ICLight
 from libiclight.briarmbg import BriaRMBG
 from libiclight.utils import (
     run_rmbg,
-    resize_without_crop,
     resize_and_center_crop,
     numpy2pytorch,
-    pytorch2numpy,
 )
 
 
@@ -134,7 +132,8 @@ class ICLightArgs(BaseModel):
     model_type: ModelType = ModelType.FC
     input_fg: np.ndarray
     uploaded_bg: Optional[np.ndarray] = None
-    bg_source: BGSourceFC | BGSourceFBC = BGSourceFC.NONE
+    bg_source_fc: BGSourceFC = BGSourceFC.NONE
+    bg_source_fbc: BGSourceFBC = BGSourceFBC.UPLOAD
 
     class Config:
         arbitrary_types_allowed = True
@@ -157,7 +156,7 @@ class ICLightArgs(BaseModel):
         else:
             assert self.model_type == ModelType.FBC
             bg = resize_and_center_crop(
-                self.bg_source.get_bg(image_width, image_height, self.uploaded_bg),
+                self.bg_source_fbc.get_bg(image_width, image_height, self.uploaded_bg),
                 image_width,
                 image_height,
             )
@@ -194,15 +193,26 @@ class ICLightForge(scripts.Script):
                 )
 
             model_type = gr.Dropdown(
+                visible=False,
                 choices=[e.value for e in ModelType],
                 label="Model",
-                value=ModelType.FC.value,
+                value=ModelType.FC.value if is_img2img else ModelType.FBC.value,
             )
-            bg_source = gr.Radio(
+
+            bg_source_fc = gr.Radio(
                 choices=[e.value for e in BGSourceFC],
                 value=BGSourceFC.NONE.value,
                 label="Background Source",
                 type="value",
+                visible=is_img2img,
+            )
+
+            bg_source_fbc = gr.Radio(
+                choices=[e.value for e in BGSourceFBC],
+                value=BGSourceFC.NONE.value,
+                label="Background Source",
+                type="value",
+                visible=not is_img2img,
             )
 
         # TODO return a dict here so that API calls are cleaner.
@@ -211,23 +221,27 @@ class ICLightForge(scripts.Script):
             model_type,
             input_fg,
             uploaded_bg,
-            bg_source,
+            bg_source_fc,
+            bg_source_fbc,
         )
 
     def process_before_every_sampling(
         self, p: StableDiffusionProcessing, *script_args, **kwargs
     ):
-        device = torch.device("cuda")
-        rmbg = BriaRMBG.from_pretrained("briaai/RMBG-1.4")
         args = ICLightArgs(
             **{
                 k: v
                 for k, v in zip(
-                    vars(ICLightArgs).keys(),
+                    vars(self.DEFAULT_ARGS).keys(),
                     script_args,
                 )
             }
         )
+        if not args.enabled:
+            return
+
+        device = torch.device("cuda")
+        rmbg = BriaRMBG.from_pretrained("briaai/RMBG-1.4")
 
         work_model: ModelPatcher = p.sd_model.forge_objects.unet.clone()
         vae: ModelPatcher = p.sd_model.forge_objects.vae.clone()
