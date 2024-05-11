@@ -8,10 +8,7 @@ from pydantic import BaseModel
 
 from modules import scripts
 from modules.ui_components import InputAccordion
-from modules.processing import (
-    StableDiffusionProcessing,
-    StableDiffusionProcessingImg2Img,
-)
+from modules.processing import StableDiffusionProcessing
 from modules.paths import models_path
 from ldm_patched.modules.utils import load_torch_file
 from ldm_patched.modules.model_patcher import ModelPatcher
