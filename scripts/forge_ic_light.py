@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import os
 import torch
 import gradio as gr
@@ -6,7 +7,7 @@ from enum import Enum
 from typing import Optional, Tuple
 from pydantic import BaseModel
 
-from modules import scripts
+from modules import scripts, script_callbacks
 from modules.ui_components import InputAccordion
 from modules.processing import StableDiffusionProcessing
 from modules.paths import models_path
@@ -21,6 +22,32 @@ from libiclight.utils import (
     resize_and_center_crop,
     forge_numpy2pytorch,
 )
+
+
+@dataclass
+class A1111Context:
+    """Contains all components from A1111."""
+
+    txt2img_submit_button: Optional[gr.components.Component] = None
+    img2img_submit_button: Optional[gr.components.Component] = None
+
+    # Slider controls from A1111 WebUI.
+    img2img_w_slider: Optional[gr.components.Component] = None
+    img2img_h_slider: Optional[gr.components.Component] = None
+
+    img2img_image: Optional[gr.Image] = None
+
+    def set_component(self, component: gr.components.Component):
+        id_mapping = {
+            "txt2img_generate": "txt2img_submit_button",
+            "img2img_generate": "img2img_submit_button",
+            "img2img_width": "img2img_w_slider",
+            "img2img_height": "img2img_h_slider",
+            "img2img_image": "img2img_image",
+        }
+        elem_id = getattr(component, "elem_id", None)
+        if elem_id in id_mapping and getattr(self, id_mapping[elem_id]) is None:
+            setattr(self, id_mapping[elem_id], component)
 
 
 class BGSourceFC(Enum):
@@ -171,6 +198,7 @@ class ICLightForge(scripts.Script):
     DEFAULT_ARGS = ICLightArgs(
         input_fg=np.zeros(shape=[1, 1, 1], dtype=np.uint8),
     )
+    a1111_context = A1111Context()
 
     def title(self):
         return "IC Light"
@@ -198,6 +226,8 @@ class ICLightForge(scripts.Script):
                     type="numpy",
                     label="Background",
                     height=480,
+                    interactive=True,
+                    visible=not is_img2img,
                 )
 
             model_type = gr.Dropdown(
@@ -234,6 +264,31 @@ class ICLightForge(scripts.Script):
             bg_source_fc,
             bg_source_fbc,
         )
+
+        if is_img2img:
+
+            def update_img2img_input(bg_source_fc: str, height: int, width: int):
+                return gr.update(
+                    value=BGSourceFC(bg_source_fc).get_bg(
+                        image_width=width, image_height=height
+                    )
+                )
+
+            # FC need to change img2img input.
+            for component in (
+                bg_source_fc,
+                ICLightForge.a1111_context.img2img_h_slider,
+                ICLightForge.a1111_context.img2img_w_slider,
+            ):
+                component.change(
+                    fn=update_img2img_input,
+                    inputs=[
+                        bg_source_fc,
+                        ICLightForge.a1111_context.img2img_h_slider,
+                        ICLightForge.a1111_context.img2img_w_slider,
+                    ],
+                    outputs=ICLightForge.a1111_context.img2img_image,
+                )
 
         def on_model_type_change(model_type: str):
             model_type = ModelType(model_type)
@@ -287,3 +342,11 @@ class ICLightForge(scripts.Script):
         )[0]
 
         p.sd_model.forge_objects.unet = patched_unet
+
+    @staticmethod
+    def on_after_component(component, **_kwargs):
+        """Register the A1111 component."""
+        ICLightForge.a1111_context.set_component(component)
+
+
+script_callbacks.on_after_component(ICLightForge.on_after_component)
