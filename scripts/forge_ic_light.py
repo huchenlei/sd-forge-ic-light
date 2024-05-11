@@ -9,7 +9,10 @@ from pydantic import BaseModel
 
 from modules import scripts, script_callbacks
 from modules.ui_components import InputAccordion
-from modules.processing import StableDiffusionProcessing, StableDiffusionProcessingTxt2Img
+from modules.processing import (
+    StableDiffusionProcessing,
+    StableDiffusionProcessingTxt2Img,
+)
 from modules.paths import models_path
 from ldm_patched.modules.utils import load_torch_file
 from ldm_patched.modules.model_patcher import ModelPatcher
@@ -170,7 +173,7 @@ class ICLightArgs(BaseModel):
         p: StableDiffusionProcessing,
         device: torch.device,
     ) -> dict:
-        is_hr_pass = getattr(p, 'is_hr_pass', False)
+        is_hr_pass = getattr(p, "is_hr_pass", False)
         if is_hr_pass:
             assert isinstance(p, StableDiffusionProcessingTxt2Img)
             # TODO: Move the calculation to Forge main repo.
@@ -238,7 +241,7 @@ class ICLightForge(scripts.Script):
                     label="Background",
                     height=480,
                     interactive=True,
-                    visible=not is_img2img,
+                    visible=False,
                 )
 
             model_type = gr.Dropdown(
@@ -301,7 +304,7 @@ class ICLightForge(scripts.Script):
                     outputs=ICLightForge.a1111_context.img2img_image,
                 )
 
-        def on_model_type_change(model_type: str):
+        def shift_enum_radios(model_type: str):
             model_type = ModelType(model_type)
             if model_type == ModelType.FC:
                 return gr.update(visible=True), gr.update(visible=False)
@@ -310,9 +313,18 @@ class ICLightForge(scripts.Script):
                 return gr.update(visible=False), gr.update(visible=True)
 
         model_type.change(
-            fn=on_model_type_change,
+            fn=shift_enum_radios,
             inputs=[model_type],
             outputs=[bg_source_fc, bg_source_fbc],
+            show_progress=False,
+        )
+
+        model_type.change(
+            fn=lambda model_type: gr.update(
+                visible=ModelType(model_type) == ModelType.FBC
+            ),
+            inputs=[model_type],
+            outputs=[uploaded_bg],
             show_progress=False,
         )
 
