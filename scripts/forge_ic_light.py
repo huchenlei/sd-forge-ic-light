@@ -270,14 +270,29 @@ class ICLightForge(scripts.Script):
                 interactive=True,
             )
 
-        # TODO return a dict here so that API calls are cleaner.
-        states = (
-            enabled,
-            model_type,
-            input_fg,
-            uploaded_bg,
-            bg_source_fc,
-            bg_source_fbc,
+        state = gr.State({})
+        (
+            ICLightForge.a1111_context.img2img_submit_button
+            if is_img2img
+            else ICLightForge.a1111_context.txt2img_submit_button
+        ).click(
+            fn=lambda *args: {
+                k: v
+                for k, v in zip(
+                    vars(self.DEFAULT_ARGS).keys(),
+                    args,
+                )
+            },
+            inputs=[
+                enabled,
+                model_type,
+                input_fg,
+                uploaded_bg,
+                bg_source_fc,
+                bg_source_fbc,
+            ],
+            outputs=state,
+            queue=False,
         )
 
         if is_img2img:
@@ -331,20 +346,12 @@ class ICLightForge(scripts.Script):
             show_progress=False,
         )
 
-        return states
+        return (state,)
 
     def process_before_every_sampling(
-        self, p: StableDiffusionProcessing, *script_args, **kwargs
+        self, p: StableDiffusionProcessing, args_dict, **kwargs
     ):
-        args = ICLightArgs(
-            **{
-                k: v
-                for k, v in zip(
-                    vars(self.DEFAULT_ARGS).keys(),
-                    script_args,
-                )
-            }
-        )
+        args = ICLightArgs(**args_dict)
         if not args.enabled:
             return
 
