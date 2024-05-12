@@ -62,6 +62,7 @@ class BGSourceFC(Enum):
     RIGHT = "Right Light"
     TOP = "Top Light"
     BOTTOM = "Bottom Light"
+    CUSTOM = "Custom LightMap"
 
     def get_bg(
         self,
@@ -282,8 +283,12 @@ class ICLightForge(scripts.Script):
         if is_img2img:
 
             def update_img2img_input(bg_source_fc: str, height: int, width: int):
+                bg_source_fc = BGSourceFC(bg_source_fc)
+                if bg_source_fc == BGSourceFC.CUSTOM:
+                    return gr.skip()
+
                 return gr.update(
-                    value=BGSourceFC(bg_source_fc).get_bg(
+                    value=bg_source_fc.get_bg(
                         image_width=width, image_height=height
                     )
                 )
