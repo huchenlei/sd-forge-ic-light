@@ -288,9 +288,7 @@ class ICLightForge(scripts.Script):
                     return gr.skip()
 
                 return gr.update(
-                    value=bg_source_fc.get_bg(
-                        image_width=width, image_height=height
-                    )
+                    value=bg_source_fc.get_bg(image_width=width, image_height=height)
                 )
 
             # FC need to change img2img input.
@@ -354,7 +352,10 @@ class ICLightForge(scripts.Script):
         rmbg = BriaRMBG.from_pretrained("briaai/RMBG-1.4").to(device=device)
         alpha = run_rmbg(rmbg, img=args.input_fg, device=device)
         input_rgb: np.ndarray = (
-            (args.input_fg.astype(np.float32) * alpha).astype(np.uint8).clip(0, 255)
+            # Make masked area grey.
+            (args.input_fg.astype(np.float32) * alpha + (1 - alpha) * 127)
+            .astype(np.uint8)
+            .clip(0, 255)
         )
 
         work_model: ModelPatcher = p.sd_model.forge_objects.unet.clone()
