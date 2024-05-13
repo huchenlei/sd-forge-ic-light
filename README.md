@@ -27,7 +27,7 @@ After you select value from the radio, the img2img input will automatically be s
 ![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/4b768af2-c9ac-4fc2-9762-a2df45ec3371)
 
 ### Given FG and BG, Put FG on BG and relight [Txt2Img][HR available]
-![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/ff6dcbb7-9f8a-4918-b3dd-aaaa85ea04ce)
+![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/c5e57d36-8191-412c-8eb3-3ba1bc109571)
 
 ## TODOs
 
