@@ -5,9 +5,10 @@ import gradio as gr
 import numpy as np
 from enum import Enum
 from typing import Optional, Tuple
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 from modules import scripts, script_callbacks
+from modules.api import api
 from modules.ui_components import InputAccordion
 from modules.processing import (
     StableDiffusionProcessing,
@@ -163,6 +164,36 @@ class ICLightArgs(BaseModel):
     uploaded_bg: Optional[np.ndarray] = None
     bg_source_fc: BGSourceFC = BGSourceFC.NONE
     bg_source_fbc: BGSourceFBC = BGSourceFBC.UPLOAD
+
+    @classmethod
+    def cls_decode_base64(cls, base64string: str) -> np.ndarray:
+        return np.array(api.decode_base64_to_image(base64string)).astype("uint8")
+
+    @validator("input_fg", pre=True)
+    def parse_input_fg(cls, value) -> np.ndarray:
+        if isinstance(value, str):
+            return cls.cls_decode_base64(value)
+        assert isinstance(value, np.ndarray)
+        return value
+
+    @validator("uploaded_bg", pre=True)
+    def parse_input_bg(cls, value) -> np.ndarray:
+        if isinstance(value, str):
+            return cls.cls_decode_base64(value)
+        assert isinstance(value, np.ndarray) or value is None
+        return value
+
+    @classmethod
+    def fetch_from(cls, p: StableDiffusionProcessing):
+        script_runner: scripts.ScriptRunner = p.scripts
+        ic_light_script: scripts.Script = [
+            script
+            for script in script_runner.alwayson_scripts
+            if script.title() == "IC Light"
+        ][0]
+        args = p.script_args[ic_light_script.args_from : ic_light_script.args_to]
+        assert len(args) == 1
+        return ICLightArgs(**args[0])
 
     class Config:
         arbitrary_types_allowed = True
@@ -348,10 +379,8 @@ class ICLightForge(scripts.Script):
 
         return (state,)
 
-    def process_before_every_sampling(
-        self, p: StableDiffusionProcessing, args_dict, **kwargs
-    ):
-        args = ICLightArgs(**args_dict)
+    def process_before_every_sampling(self, p: StableDiffusionProcessing, *args, **kwargs):
+        args = ICLightArgs.fetch_from(p)
         if not args.enabled:
             return
 
