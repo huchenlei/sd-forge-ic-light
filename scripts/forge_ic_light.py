@@ -160,7 +160,7 @@ class ModelType(Enum):
 class ICLightArgs(BaseModel):
     enabled: bool = False
     model_type: ModelType = ModelType.FC
-    input_fg: np.ndarray
+    input_fg: Optional[np.ndarray] = None
     uploaded_bg: Optional[np.ndarray] = None
     bg_source_fc: BGSourceFC = BGSourceFC.NONE
     bg_source_fbc: BGSourceFBC = BGSourceFBC.UPLOAD
@@ -173,7 +173,7 @@ class ICLightArgs(BaseModel):
     def parse_input_fg(cls, value) -> np.ndarray:
         if isinstance(value, str):
             return cls.cls_decode_base64(value)
-        assert isinstance(value, np.ndarray)
+        assert isinstance(value, np.ndarray) or value is None
         return value
 
     @validator("uploaded_bg", pre=True)
