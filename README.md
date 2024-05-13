@@ -30,7 +30,6 @@ After you select value from the radio, the img2img input will automatically be s
 ![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/ff6dcbb7-9f8a-4918-b3dd-aaaa85ea04ce)
 
 ## TODOs
-- Add API support
+
 - Add infotext support
-- Add image with bg removed to output
 - Add option to skip remove bg operation
