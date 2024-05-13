@@ -379,7 +379,9 @@ class ICLightForge(scripts.Script):
 
         return (state,)
 
-    def process_before_every_sampling(self, p: StableDiffusionProcessing, *args, **kwargs):
+    def process_before_every_sampling(
+        self, p: StableDiffusionProcessing, *args, **kwargs
+    ):
         args = ICLightArgs.fetch_from(p)
         if not args.enabled:
             return
