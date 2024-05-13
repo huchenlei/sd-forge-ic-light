@@ -397,7 +397,7 @@ class ICLightForge(scripts.Script):
         )
 
         work_model: ModelPatcher = p.sd_model.forge_objects.unet.clone()
-        vae: ModelPatcher = p.sd_model.forge_objects.vae.clone()
+        vae: VAE = p.sd_model.forge_objects.vae.clone()
         unet_path = os.path.join(models_path, "unet", args.model_type.model_name)
         ic_model_state_dict = load_torch_file(unet_path, device=device)
         node = ICLight()
@@ -409,6 +409,7 @@ class ICLightForge(scripts.Script):
         )[0]
 
         p.sd_model.forge_objects.unet = patched_unet
+        p.extra_result_images.append(input_rgb)
 
     @staticmethod
     def on_after_component(component, **_kwargs):
