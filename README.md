@@ -1,35 +1,16 @@
-# sd-forge-ic-light
-SD Forge extension for [IC-Light](https://github.com/lllyasviel/IC-Light). This extension is based on https://github.com/huchenlei/ComfyUI-IC-Light-Native.
+# SD Forge IC-Light
+This is an Extension for the [Forge Webui](https://github.com/lllyasviel/stable-diffusion-webui-forge), which implements [IC-Light](https://github.com/lllyasviel/IC-Light), allowing you to manipulate the illumination of images.
 
-## Install
-![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/608fbe20-1430-4efa-93bc-166f629eaaa5)
+> This does **not** work with [Automatic1111 Webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui)
 
-### Download models
-IC-Light main repo is based on diffusers. In order to load it with UnetLoader in Forge, state_dict keys need to convert to ldm format. You can download models with ldm keys here: https://huggingface.co/huchenlei/IC-Light-ldm/tree/main
+> <ins>**Credits:**</ins>
+    - https://github.com/huchenlei/sd-forge-ic-light
+    - https://github.com/huchenlei/ComfyUI-IC-Light-Native
 
-There are 2 models:
-- iclight_sd15_fc_unet_ldm: Use this in FG workflows
-- iclight_sd15_fbc_unet_ldm: Use this in BG workflows
+<h1 align="center">W.I.P</h1>
 
-After you download these models, please put them under `stable-diffusion-webui-forge/models/unet`. You might want to manually create the `unet` folder.
-
-## How to use
-For best result, it is recommended to use low CFG and strong denosing strength.
-
-### Given FG, Generate BG and relight [Txt2Img][HR available]
-![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/00fbae46-b5cf-4415-89ac-5b23b1a8f463)
-
-### Given FG and light map, Genereate BG and relight [Img2Img]
-After you select value from the radio, the img2img input will automatically be set by the extension. 
-![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/1b9e9c87-e8ef-4505-ab04-ade37336a8a3)
-![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/618ba4d4-5df7-4084-bdf1-44927f77a581)
-![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/899bf635-1aac-40e5-bf4f-ca801e7922d5)
-![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/4b768af2-c9ac-4fc2-9762-a2df45ec3371)
-
-### Given FG and BG, Put FG on BG and relight [Txt2Img][HR available]
-![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/c5e57d36-8191-412c-8eb3-3ba1bc109571)
-
-## TODOs
-
-- Add infotext support
-- Add option to skip remove bg operation
+## Getted Started
+1. Download the **2** models from [Releases](https://github.com/Haoming02/sd-forge-ic-light/releases)
+2. Create a new folder, `ic-light`, inside your webui `models` folder
+3. Place the 2 models inside the above folder
+4. **(Optional)** You can rename the models, as long as the filename contains either **`fc`** or **`fbc`**

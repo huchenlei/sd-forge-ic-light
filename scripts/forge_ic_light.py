@@ -14,7 +14,7 @@ from modules.processing import (
     StableDiffusionProcessing,
     StableDiffusionProcessingTxt2Img,
 )
-from modules.paths import models_path
+from scripts.model_loader import ModelType
 from ldm_patched.modules.utils import load_torch_file
 from ldm_patched.modules.model_patcher import ModelPatcher
 from ldm_patched.modules.sd import VAE
@@ -144,19 +144,6 @@ class BGSourceFBC(Enum):
         return input_bg
 
 
-class ModelType(Enum):
-    FC = "FC"
-    FBC = "FBC"
-
-    @property
-    def model_name(self) -> str:
-        if self == ModelType.FC:
-            return "iclight_sd15_fc_unet_ldm.safetensors"
-        else:
-            assert self == ModelType.FBC
-            return "iclight_sd15_fbc_unet_ldm.safetensors"
-
-
 class ICLightArgs(BaseModel):
     enabled: bool = False
     model_type: ModelType = ModelType.FC
@@ -256,10 +243,10 @@ class ICLightForge(scripts.Script):
 
     def ui(self, is_img2img: bool) -> Tuple[gr.components.Component, ...]:
         if is_img2img:
-            model_type_choices = [ModelType.FC.value]
+            model_type_choices = [ModelType.FC.name]
             bg_source_fc_choices = [e.value for e in BGSourceFC if e != BGSourceFC.NONE]
         else:
-            model_type_choices = [ModelType.FC.value, ModelType.FBC.value]
+            model_type_choices = [ModelType.FC.name, ModelType.FBC.name]
             bg_source_fc_choices = [BGSourceFC.NONE.value]
 
         with InputAccordion(value=False, label=self.title()) as enabled:
@@ -279,7 +266,7 @@ class ICLightForge(scripts.Script):
             model_type = gr.Dropdown(
                 label="Model",
                 choices=model_type_choices,
-                value=ModelType.FC.value,
+                value=ModelType.FC.name,
                 interactive=True,
             )
 
@@ -354,12 +341,13 @@ class ICLightForge(scripts.Script):
                 )
 
         def shift_enum_radios(model_type: str):
-            model_type = ModelType(model_type)
-            if model_type == ModelType.FC:
-                return gr.update(visible=True), gr.update(visible=False)
-            else:
-                assert model_type == ModelType.FBC
-                return gr.update(visible=False), gr.update(visible=True)
+            match ModelType.get(model_type):
+                case ModelType.FC:
+                    return gr.update(visible=True), gr.update(visible=False)
+                case ModelType.FBC:
+                    return gr.update(visible=False), gr.update(visible=True)
+                case _:
+                    raise SystemError
 
         model_type.change(
             fn=shift_enum_radios,
@@ -370,7 +358,7 @@ class ICLightForge(scripts.Script):
 
         model_type.change(
             fn=lambda model_type: gr.update(
-                visible=ModelType(model_type) == ModelType.FBC
+                visible=ModelType.get(model_type) == ModelType.FBC
             ),
             inputs=[model_type],
             outputs=[uploaded_bg],
@@ -398,8 +386,7 @@ class ICLightForge(scripts.Script):
 
         work_model: ModelPatcher = p.sd_model.forge_objects.unet.clone()
         vae: VAE = p.sd_model.forge_objects.vae.clone()
-        unet_path = os.path.join(models_path, "unet", args.model_type.model_name)
-        ic_model_state_dict = load_torch_file(unet_path, device=device)
+        ic_model_state_dict = load_torch_file(args.model_type.path, device=device)
         node = ICLight()
 
         patched_unet: ModelPatcher = node.apply(
