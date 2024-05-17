@@ -20,10 +20,9 @@ from ldm_patched.modules.model_patcher import ModelPatcher
 from ldm_patched.modules.sd import VAE
 
 from libiclight.ic_light_nodes import ICLight
-from libiclight.briarmbg import BriaRMBG
+from libiclight.rembg_utils import run_rmbg
 from libiclight.utils import (
     align_dim_latent,
-    run_rmbg,
     resize_and_center_crop,
     forge_numpy2pytorch,
 )
@@ -179,6 +178,8 @@ class ICLightArgs(BaseModel):
             if script.title() == "IC Light"
         ][0]
         args = p.script_args[ic_light_script.args_from : ic_light_script.args_to]
+        args[0]["model_type"] = ModelType.get(args[0]["model_type"])
+
         assert len(args) == 1
         return ICLightArgs(**args[0])
 
@@ -375,14 +376,7 @@ class ICLightForge(scripts.Script):
             return
 
         device = torch.device("cuda")
-        rmbg = BriaRMBG.from_pretrained("briaai/RMBG-1.4").to(device=device)
-        alpha = run_rmbg(rmbg, img=args.input_fg, device=device)
-        input_rgb: np.ndarray = (
-            # Make masked area grey.
-            (args.input_fg.astype(np.float32) * alpha + (1 - alpha) * 127)
-            .astype(np.uint8)
-            .clip(0, 255)
-        )
+        input_rgb: np.ndarray = run_rmbg(args.input_fg)
 
         work_model: ModelPatcher = p.sd_model.forge_objects.unet.clone()
         vae: VAE = p.sd_model.forge_objects.vae.clone()

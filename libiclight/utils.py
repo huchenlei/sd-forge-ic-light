@@ -55,20 +55,6 @@ def resize_without_crop(image, target_width, target_height):
     return np.array(resized_image)
 
 
-@torch.inference_mode()
-def run_rmbg(rmbg, img, device=torch.device("cuda")) -> np.ndarray:
-    H, W, C = img.shape
-    assert C == 3
-    k = (256.0 / float(H * W)) ** 0.5
-    feed = resize_without_crop(img, int(64 * round(W * k)), int(64 * round(H * k)))
-    feed = numpy2pytorch([feed]).to(device=device, dtype=torch.float32)
-    alpha = rmbg(feed)[0][0]
-    alpha = torch.nn.functional.interpolate(alpha, size=(H, W), mode="bilinear")
-    alpha = alpha.movedim(1, -1)[0]
-    alpha = alpha.detach().float().cpu().numpy().clip(0, 1)
-    return alpha
-
-
 def align_dim_latent(x: int) -> int:
     """Align the pixel dimension (w/h) to latent dimension.
     Stable diffusion 1:8 ratio for latent/pixel, i.e.,
