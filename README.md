@@ -5,7 +5,7 @@ This is an Extension for the [Forge Webui](https://github.com/lllyasviel/stable-
 
 <h1 align="center">W.I.P</h1>
 
-## Getted Started
+## Getting Started
 1. Download the **2** models from [Releases](https://github.com/Haoming02/sd-forge-ic-light/releases)
 2. Create a new folder, `ic-light`, inside your webui `models` folder
 3. Place the 2 models inside said folder

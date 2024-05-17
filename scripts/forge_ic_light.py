@@ -2,11 +2,17 @@ from ldm_patched.modules.model_patcher import ModelPatcher
 from ldm_patched.modules.utils import load_torch_file
 
 from modules import scripts, script_callbacks
-from modules.processing import StableDiffusionProcessingTxt2Img
 from modules.ui_components import InputAccordion
 from modules.api import api
 
+from modules.processing import (
+    StableDiffusionProcessing,
+    StableDiffusionProcessingTxt2Img,
+    StableDiffusionProcessingImg2Img,
+)
+
 from scripts.model_loader import ModelType
+from scripts.ic_modes import t2i_fc, t2i_fbc, i2i_fc
 
 from libiclight.ic_light_nodes import ICLight
 from libiclight.rembg_utils import run_rmbg
@@ -20,6 +26,7 @@ from pydantic import BaseModel, validator
 from typing import Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
+from PIL import Image
 import gradio as gr
 import numpy as np
 import torch
@@ -181,7 +188,7 @@ class ICLightArgs(BaseModel):
         return value
 
     @classmethod
-    def fetch_from(cls, p):
+    def fetch_from(cls, p: StableDiffusionProcessing):
         script_runner: scripts.ScriptRunner = p.scripts
         ic_light_script: scripts.Script = [
             script
@@ -202,36 +209,43 @@ class ICLightArgs(BaseModel):
         self,
         processed_fg: np.ndarray,  # fg with bg removed.
         vae,
-        p,
+        p: StableDiffusionProcessing,
         device: torch.device,
     ) -> dict:
 
         if getattr(p, "is_hr_pass", False):
             assert isinstance(p, StableDiffusionProcessingTxt2Img)
-            # TODO: Move the calculation to Forge main repo.
+
             if p.hr_resize_x == 0 and p.hr_resize_y == 0:
                 hr_x = int(p.width * p.hr_scale)
                 hr_y = int(p.height * p.hr_scale)
+
             else:
                 hr_y, hr_x = p.hr_resize_y, p.hr_resize_x
+
             image_width = align_dim_latent(hr_x)
             image_height = align_dim_latent(hr_y)
+
         else:
             image_width = p.width
             image_height = p.height
 
         fg = resize_and_center_crop(processed_fg, image_width, image_height)
 
-        if self.model_type == ModelType.FC:
-            np_concat = [fg]
-        else:
-            assert self.model_type == ModelType.FBC
-            bg = resize_and_center_crop(
-                self.bg_source_fbc.get_bg(image_width, image_height, self.uploaded_bg),
-                image_width,
-                image_height,
-            )
-            np_concat = [fg, bg]
+        match self.model_type:
+            case ModelType.FC:
+                np_concat = [fg]
+            case ModelType.FBC:
+                bg = resize_and_center_crop(
+                    self.bg_source_fbc.get_bg(
+                        image_width, image_height, self.uploaded_bg
+                    ),
+                    image_width,
+                    image_height,
+                )
+                np_concat = [fg, bg]
+            case _:
+                raise SystemError
 
         concat_conds = forge_numpy2pytorch(np.stack(np_concat, axis=0)).to(
             device=device, dtype=torch.float16
@@ -246,6 +260,9 @@ class ICLightArgs(BaseModel):
 class ICLightForge(scripts.Script):
     DEFAULT_ARGS = ICLightArgs(input_fg=np.zeros((1, 1, 1), dtype=np.uint8))
     a1111_context = A1111Context()
+
+    def __init__(self):
+        self.args: ICLightArgs = None
 
     def title(self):
         return "IC Light"
@@ -265,10 +282,20 @@ class ICLightForge(scripts.Script):
         with InputAccordion(value=False, label=self.title()) as enabled:
 
             with gr.Row():
+                model_type = gr.Dropdown(
+                    label="Mode",
+                    choices=model_type_choices,
+                    value=ModelType.FC.name,
+                    interactive=(not is_img2img),
+                )
+
+                desc = gr.Markdown(i2i_fc if is_img2img else t2i_fc)
+
+            with gr.Row():
                 input_fg = gr.Image(
                     source="upload",
                     type="numpy",
-                    label="Foreground",
+                    label=("Lighting Conditioning" if is_img2img else "Foreground"),
                     height=480,
                     interactive=True,
                     visible=True,
@@ -281,13 +308,6 @@ class ICLightForge(scripts.Script):
                     interactive=True,
                     visible=False,
                 )
-
-            model_type = gr.Dropdown(
-                label="Model",
-                choices=model_type_choices,
-                value=ModelType.FC.name,
-                interactive=True,
-            )
 
             bg_source_fc = gr.Radio(
                 label="Background Source",
@@ -302,7 +322,7 @@ class ICLightForge(scripts.Script):
 
             bg_source_fbc = gr.Radio(
                 label="Background Source",
-                choices=[e.value for e in BGSourceFBC],
+                choices=[BGSourceFBC.UPLOAD.value, BGSourceFBC.UPLOAD_FLIP.value],
                 value=BGSourceFBC.UPLOAD.value,
                 type="value",
                 visible=False,
@@ -336,7 +356,7 @@ class ICLightForge(scripts.Script):
 
         if is_img2img:
 
-            def update_img2img_input(bg_source_fc: str, height: int, width: int):
+            def update_img2img_input(bg_source_fc: str, width: int, height: int):
                 bg_source_fc = BGSourceFC(bg_source_fc)
                 if bg_source_fc == BGSourceFC.CUSTOM:
                     return gr.skip()
@@ -348,62 +368,78 @@ class ICLightForge(scripts.Script):
             # FC need to change img2img input.
             for component in (
                 bg_source_fc,
-                ICLightForge.a1111_context.img2img_h_slider,
                 ICLightForge.a1111_context.img2img_w_slider,
+                ICLightForge.a1111_context.img2img_h_slider,
             ):
                 component.change(
                     fn=update_img2img_input,
                     inputs=[
                         bg_source_fc,
-                        ICLightForge.a1111_context.img2img_h_slider,
                         ICLightForge.a1111_context.img2img_w_slider,
+                        ICLightForge.a1111_context.img2img_h_slider,
                     ],
-                    outputs=ICLightForge.a1111_context.img2img_image,
+                    outputs=[input_fg],
                 )
 
-        def on_model_change(model_type: str):
-            match ModelType.get(model_type):
-                case ModelType.FC:
-                    return (
-                        gr.update(visible=is_img2img),
-                        gr.update(visible=False),
-                        gr.update(visible=False),
-                    )
-                case ModelType.FBC:
-                    return (
-                        gr.update(visible=False),
-                        gr.update(visible=True),
-                        gr.update(visible=True),
-                    )
-                case _:
-                    raise SystemError
+        else:
 
-        model_type.change(
-            fn=on_model_change,
-            inputs=[model_type],
-            outputs=[bg_source_fc, bg_source_fbc, uploaded_bg],
-            show_progress=False,
-        )
+            def on_model_change(model_type: str):
+                match ModelType.get(model_type):
+                    case ModelType.FC:
+                        return (
+                            gr.update(visible=False),
+                            gr.update(visible=False),
+                            gr.update(value=t2i_fc),
+                        )
+                    case ModelType.FBC:
+                        return (
+                            gr.update(visible=True),
+                            gr.update(visible=True),
+                            gr.update(value=t2i_fbc),
+                        )
+                    case _:
+                        raise SystemError
+
+            model_type.change(
+                fn=on_model_change,
+                inputs=[model_type],
+                outputs=[bg_source_fbc, uploaded_bg, desc],
+                show_progress=False,
+            )
 
         return (state,)
 
-    def process_before_every_sampling(self, p, *args, **kwargs):
+    def before_process(self, p, *args, **kwargs):
         args = ICLightArgs.fetch_from(p)
         if not args.enabled:
+            self.args = None
+            return
+
+        if isinstance(p, StableDiffusionProcessingImg2Img):
+            input_image = np.asarray(p.init_images[0]).astype(np.uint8)
+            p.init_images[0] = Image.fromarray(args.input_fg)
+            args.input_fg = input_image
+
+        self.args = args
+
+    def process_before_every_sampling(
+        self, p: StableDiffusionProcessing, *args, **kwargs
+    ):
+        if (self.args is None) or (not self.args.enabled):
             return
 
         device = torch.device("cuda")
-        input_rgb: np.ndarray = run_rmbg(args.input_fg)
+        input_rgb: np.ndarray = run_rmbg(self.args.input_fg)
 
         work_model: ModelPatcher = p.sd_model.forge_objects.unet.clone()
         vae = p.sd_model.forge_objects.vae.clone()
-        ic_model_state_dict = load_torch_file(args.model_type.path, device=device)
+        ic_model_state_dict = load_torch_file(self.args.model_type.path, device=device)
         ic_light = ICLight()
 
         patched_unet: ModelPatcher = ic_light.apply(
             model=work_model,
             ic_model_state_dict=ic_model_state_dict,
-            c_concat=args.get_c_concat(input_rgb, vae, p, device=device),
+            c_concat=self.args.get_c_concat(input_rgb, vae, p, device=device),
         )[0]
 
         p.sd_model.forge_objects.unet = patched_unet
