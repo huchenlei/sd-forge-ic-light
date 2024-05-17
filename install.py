@@ -5,3 +5,6 @@ if not launch.is_installed("rembg"):
 
 if not launch.is_installed("onnxruntime"):
     launch.run_pip("install onnxruntime", "rembg")
+
+if not launch.is_installed("pydantic"):
+    launch.run_pip("install pydantic~=1.10.11", "rembg")

@@ -1,9 +1,9 @@
-import torch
-from typing import Tuple, TypedDict, Callable
-
-from ldm_patched.modules import model_management
 from ldm_patched.modules.model_patcher import ModelPatcher
 from ldm_patched.modules.model_base import BaseModel
+from ldm_patched.modules import model_management
+
+from typing import Tuple, TypedDict, Callable
+import torch
 
 
 class UnetParams(TypedDict):
@@ -14,21 +14,7 @@ class UnetParams(TypedDict):
 
 
 class ICLight:
-    """ICLightImpl"""
-
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "model": ("MODEL",),
-                "ic_model": ("MODEL",),
-                "c_concat": ("LATENT",),
-            },
-        }
-
-    RETURN_TYPES = ("MODEL",)
-    FUNCTION = "apply"
-    CATEGORY = "_for_testing"
+    """IC-Light Implementation"""
 
     def apply(
         self,
@@ -36,6 +22,7 @@ class ICLight:
         ic_model_state_dict: dict,
         c_concat: dict,
     ) -> Tuple[ModelPatcher]:
+
         device = model_management.get_torch_device()
         dtype = model_management.unet_dtype()
         work_model = model.clone()
@@ -81,4 +68,5 @@ class ICLight:
                 for key, value in ic_model_state_dict.items()
             }
         )
+
         return (work_model,)

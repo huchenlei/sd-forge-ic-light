@@ -19,6 +19,8 @@ AVAILABLE_MODELS = (
     # "isnet-general-use",
 )
 
+GREY = (127, 127, 127, 255)
+
 
 def run_rmbg(
     np_image: np.array,
@@ -26,7 +28,7 @@ def run_rmbg(
     foreground_threshold: int = 225,
     background_threshold: int = 16,
     erode_size: int = 16,
-    bg: tuple = (127, 127, 127, 255),
+    bg: tuple = GREY,
 ) -> np.array:
 
     if "U2NET_HOME" not in os.environ:
@@ -37,12 +39,12 @@ def run_rmbg(
     processed_image = rembg.remove(
         image,
         session=rembg.new_session(model),
-        only_mask=False,
         alpha_matting=True,
-        post_process_mask=True,
         alpha_matting_foreground_threshold=foreground_threshold,
         alpha_matting_background_threshold=background_threshold,
         alpha_matting_erode_size=erode_size,
+        post_process_mask=True,
+        only_mask=False,
         bgcolor=bg,
     )
 
