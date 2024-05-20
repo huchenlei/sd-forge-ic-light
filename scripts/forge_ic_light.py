@@ -18,6 +18,7 @@ from modules.paths import models_path
 from ldm_patched.modules.utils import load_torch_file
 from ldm_patched.modules.model_patcher import ModelPatcher
 from ldm_patched.modules.sd import VAE
+from ldm_patched.modules.model_management import get_torch_device
 
 from libiclight.ic_light_nodes import ICLight
 from libiclight.briarmbg import BriaRMBG
@@ -386,7 +387,7 @@ class ICLightForge(scripts.Script):
         if not args.enabled:
             return
 
-        device = torch.device("cuda")
+        device = get_torch_device()
         rmbg = BriaRMBG.from_pretrained("briaai/RMBG-1.4").to(device=device)
         alpha = run_rmbg(rmbg, img=args.input_fg, device=device)
         input_rgb: np.ndarray = (
