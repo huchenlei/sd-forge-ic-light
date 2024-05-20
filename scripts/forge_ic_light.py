@@ -410,7 +410,10 @@ class ICLightForge(scripts.Script):
         )[0]
 
         p.sd_model.forge_objects.unet = patched_unet
-        p.extra_result_images.append(input_rgb)
+
+        is_hr_pass = getattr(p, "is_hr_pass", False)
+        if not is_hr_pass:
+            p.extra_result_images.append(input_rgb)
 
     @staticmethod
     def on_after_component(component, **_kwargs):
