@@ -24,6 +24,7 @@ from libiclight.ic_light_nodes import ICLight
 from libiclight.briarmbg import BriaRMBG
 from libiclight.utils import (
     align_dim_latent,
+    make_masked_area_grey,
     run_rmbg,
     resize_and_center_crop,
     forge_numpy2pytorch,
@@ -165,6 +166,7 @@ class ICLightArgs(BaseModel):
     uploaded_bg: Optional[np.ndarray] = None
     bg_source_fc: BGSourceFC = BGSourceFC.NONE
     bg_source_fbc: BGSourceFBC = BGSourceFBC.UPLOAD
+    remove_bg: bool = True
 
     @classmethod
     def cls_decode_base64(cls, base64string: str) -> np.ndarray:
@@ -266,7 +268,8 @@ class ICLightForge(scripts.Script):
         with InputAccordion(value=False, label=self.title()) as enabled:
             with gr.Row():
                 input_fg = gr.Image(
-                    source="upload", type="numpy", label="Foreground", height=480
+                    source="upload", type="numpy", label="Foreground", height=480,
+                    image_mode="RGBA",
                 )
                 uploaded_bg = gr.Image(
                     source="upload",
@@ -276,6 +279,12 @@ class ICLightForge(scripts.Script):
                     interactive=True,
                     visible=False,
                 )
+
+            remove_bg = gr.Checkbox(
+                label="Background Removal",
+                value=True,
+                interactive=True,
+            )
 
             model_type = gr.Dropdown(
                 label="Model",
@@ -322,6 +331,7 @@ class ICLightForge(scripts.Script):
                 uploaded_bg,
                 bg_source_fc,
                 bg_source_fbc,
+                remove_bg,
             ],
             outputs=state,
             queue=False,
@@ -388,15 +398,22 @@ class ICLightForge(scripts.Script):
             return
 
         device = get_torch_device()
-        rmbg = BriaRMBG.from_pretrained("briaai/RMBG-1.4").to(device=device)
-        alpha = run_rmbg(rmbg, img=args.input_fg, device=device)
-        input_rgb: np.ndarray = (
-            # Make masked area grey.
-            (args.input_fg.astype(np.float32) * alpha + (1 - alpha) * 127)
-            .astype(np.uint8)
-            .clip(0, 255)
-        )
 
+        if args.remove_bg:
+            rmbg = BriaRMBG.from_pretrained("briaai/RMBG-1.4").to(device=device)
+            input_fg = args.input_fg[..., :3]
+            alpha = run_rmbg(rmbg, img=input_fg, device=device)
+            input_rgb: np.ndarray = make_masked_area_grey(input_fg, alpha)
+        else:
+            if args.input_fg.shape[-1] == 4:
+                input_rgb = make_masked_area_grey(
+                    args.input_fg[..., :3],
+                    args.input_fg[..., 3:].astype(np.float32) / 255.0,
+                )
+            else:
+                input_rgb = args.input_fg
+
+        assert input_rgb.shape[-1] == 3
         work_model: ModelPatcher = p.sd_model.forge_objects.unet.clone()
         vae: VAE = p.sd_model.forge_objects.vae.clone()
         unet_path = os.path.join(models_path, "unet", args.model_type.model_name)

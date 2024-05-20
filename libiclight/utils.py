@@ -74,3 +74,12 @@ def align_dim_latent(x: int) -> int:
     Stable diffusion 1:8 ratio for latent/pixel, i.e.,
     1 latent unit == 8 pixel unit."""
     return (x // 8) * 8
+
+
+def make_masked_area_grey(image: np.ndarray, alpha: np.ndarray) -> np.ndarray:
+    """Make the masked area grey."""
+    return (
+        (image.astype(np.float32) * alpha + (1 - alpha) * 127)
+        .astype(np.uint8)
+        .clip(0, 255)
+    )
