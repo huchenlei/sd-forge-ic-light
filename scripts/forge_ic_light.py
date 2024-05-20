@@ -1,3 +1,4 @@
+from ldm_patched.modules.model_management import get_torch_device
 from ldm_patched.modules.model_patcher import ModelPatcher
 from ldm_patched.modules.utils import load_torch_file
 
@@ -428,7 +429,7 @@ class ICLightForge(scripts.Script):
         if (self.args is None) or (not self.args.enabled):
             return
 
-        device = torch.device("cuda")
+        device = get_torch_device()
         input_rgb: np.ndarray = run_rmbg(self.args.input_fg)
 
         work_model: ModelPatcher = p.sd_model.forge_objects.unet.clone()
@@ -443,7 +444,10 @@ class ICLightForge(scripts.Script):
         )[0]
 
         p.sd_model.forge_objects.unet = patched_unet
-        p.extra_result_images.append(input_rgb)
+
+        is_hr_pass = getattr(p, "is_hr_pass", False)
+        if not is_hr_pass:
+            p.extra_result_images.append(input_rgb)
 
     @staticmethod
     def on_after_component(component, **_kwargs):
