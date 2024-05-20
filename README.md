@@ -29,7 +29,12 @@ After you select value from the radio, the img2img input will automatically be s
 ### Given FG and BG, Put FG on BG and relight [Txt2Img][HR available]
 ![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/c5e57d36-8191-412c-8eb3-3ba1bc109571)
 
+### Skip remove bg
+If the default remove bg cannot achieve your desired effect, you can use other tools to create an RGBA image
+and uncheck the remove bg checkbox.
+![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/fc6c583e-9de5-4555-ac36-48ca3f47fce7)
+![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/dbf24894-2cfe-4d61-9529-9d2620380f0d)
+
 ## TODOs
 
 - Add infotext support
-- Add option to skip remove bg operation
