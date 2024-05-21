@@ -3,8 +3,6 @@ This is an Extension for the [Forge Webui](https://github.com/lllyasviel/stable-
 
 > This does **not** work with [Automatic1111 Webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui)
 
-<h1 align="center">W.I.P</h1>
-
 ## Getting Started
 1. Download the **2** models from [Releases](https://github.com/Haoming02/sd-forge-ic-light/releases)
 2. Create a new folder, `ic-light`, inside your webui `models` folder

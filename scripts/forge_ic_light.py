@@ -15,6 +15,7 @@ from modules.processing import (
 from scripts.model_loader import ModelType
 from scripts.ic_modes import t2i_fc, t2i_fbc, i2i_fc
 
+from libiclight.detail_utils import restore_detail
 from libiclight.ic_light_nodes import ICLight
 from libiclight.rembg_utils import run_rmbg
 from libiclight.utils import (
@@ -129,6 +130,7 @@ class BGSourceFBC(Enum):
                 input_bg = uploaded_bg
 
             case BGSourceFBC.UPLOAD_FLIP:
+                assert uploaded_bg is not None
                 input_bg = np.fliplr(uploaded_bg)
 
             case BGSourceFBC.GREY:
@@ -165,6 +167,9 @@ class BGSourceFBC(Enum):
 class ICLightArgs(BaseModel):
     enabled: bool = False
     model_type: ModelType = None
+    restore_detail: bool = False
+    use_rmbg: bool = False
+    blur_radius: int = 5
     input_fg: Optional[np.ndarray] = None
     uploaded_bg: Optional[np.ndarray] = None
     bg_source_fc: BGSourceFC = BGSourceFC.NONE
@@ -330,6 +335,21 @@ class ICLightForge(scripts.Script):
                 interactive=True,
             )
 
+            with InputAccordion(value=False, label="Restore Details") as restore_detail:
+
+                use_rmbg = gr.Checkbox(
+                    label="Use the [Image with Background Removed] instead of the [Original Input]"
+                )
+
+                blur_radius = gr.Slider(
+                    label="Blur Radius",
+                    info="for Difference of Gaussian",
+                    minimum=1,
+                    maximum=9,
+                    step=2,
+                    value=5,
+                )
+
         state = gr.State({})
         (
             ICLightForge.a1111_context.img2img_submit_button
@@ -346,6 +366,9 @@ class ICLightForge(scripts.Script):
             inputs=[
                 enabled,
                 model_type,
+                restore_detail,
+                use_rmbg,
+                blur_radius,
                 input_fg,
                 uploaded_bg,
                 bg_source_fc,
@@ -357,30 +380,18 @@ class ICLightForge(scripts.Script):
 
         if is_img2img:
 
-            def update_img2img_input(bg_source_fc: str, width: int, height: int):
+            def update_img2img_input(bg_source_fc: str):
                 bg_source_fc = BGSourceFC(bg_source_fc)
                 if bg_source_fc == BGSourceFC.CUSTOM:
                     return gr.skip()
 
-                return gr.update(
-                    value=bg_source_fc.get_bg(image_width=width, image_height=height)
-                )
+                return gr.update(value=bg_source_fc.get_bg(512, 512))
 
-            # FC need to change img2img input.
-            for component in (
-                bg_source_fc,
-                ICLightForge.a1111_context.img2img_w_slider,
-                ICLightForge.a1111_context.img2img_h_slider,
-            ):
-                component.change(
-                    fn=update_img2img_input,
-                    inputs=[
-                        bg_source_fc,
-                        ICLightForge.a1111_context.img2img_w_slider,
-                        ICLightForge.a1111_context.img2img_h_slider,
-                    ],
-                    outputs=[input_fg],
-                )
+            bg_source_fc.change(
+                fn=update_img2img_input,
+                inputs=[bg_source_fc],
+                outputs=[input_fg],
+            )
 
         else:
 
@@ -432,6 +443,10 @@ class ICLightForge(scripts.Script):
         device = get_torch_device()
         input_rgb: np.ndarray = run_rmbg(self.args.input_fg)
 
+        self.input_rgb = (
+            input_rgb if (self.args.restore_detail and self.args.use_rmbg) else None
+        )
+
         work_model: ModelPatcher = p.sd_model.forge_objects.unet.clone()
         vae = p.sd_model.forge_objects.vae.clone()
         ic_model_state_dict = load_torch_file(self.args.model_type.path, device=device)
@@ -445,9 +460,24 @@ class ICLightForge(scripts.Script):
 
         p.sd_model.forge_objects.unet = patched_unet
 
-        is_hr_pass = getattr(p, "is_hr_pass", False)
-        if not is_hr_pass:
+        if not getattr(p, "is_hr_pass", False):
             p.extra_result_images.append(input_rgb)
+
+    def postprocess_image(self, p, pp, *args, **kwargs):
+        if (
+            (self.args is None)
+            or (not self.args.enabled)
+            or (not self.args.restore_detail)
+        ):
+            return
+
+        p.extra_result_images.append(
+            restore_detail(
+                np.asarray(pp.image).astype(np.uint8),
+                self.input_rgb if self.args.use_rmbg else self.args.input_fg,
+                int(self.args.blur_radius),
+            )
+        )
 
     @staticmethod
     def on_after_component(component, **_kwargs):
