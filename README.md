@@ -9,6 +9,9 @@ This is an Extension for the [Forge Webui](https://github.com/lllyasviel/stable-
 3. Place the 2 models inside said folder
 4. **(Optional)** You can rename the models, as long as the filenames contain either **`fc`** or **`fbc`**
 
+## How to use
+W.I.P
+
 <hr>
 
 ### Based on:

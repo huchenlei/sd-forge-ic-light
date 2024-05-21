@@ -20,6 +20,7 @@ from libiclight.ic_light_nodes import ICLight
 from libiclight.rembg_utils import run_rmbg
 from libiclight.utils import (
     align_dim_latent,
+    make_masked_area_grey,
     resize_and_center_crop,
     forge_numpy2pytorch,
 )
@@ -174,6 +175,7 @@ class ICLightArgs(BaseModel):
     uploaded_bg: Optional[np.ndarray] = None
     bg_source_fc: BGSourceFC = BGSourceFC.NONE
     bg_source_fbc: BGSourceFBC = BGSourceFBC.UPLOAD
+    remove_bg: bool = True
 
     @classmethod
     def cls_decode_base64(cls, base64string: str) -> np.ndarray:
@@ -305,6 +307,7 @@ class ICLightForge(scripts.Script):
                     height=480,
                     interactive=True,
                     visible=True,
+                    image_mode="RGBA",
                 )
                 uploaded_bg = gr.Image(
                     source="upload",
@@ -314,6 +317,13 @@ class ICLightForge(scripts.Script):
                     interactive=True,
                     visible=False,
                 )
+
+            remove_bg = gr.Checkbox(
+                label="Background Removal",
+                info="Disable if you already have a subject with the background removed",
+                value=True,
+                interactive=True,
+            )
 
             bg_source_fc = gr.Radio(
                 label="Background Source",
@@ -373,6 +383,7 @@ class ICLightForge(scripts.Script):
                 uploaded_bg,
                 bg_source_fc,
                 bg_source_fbc,
+                remove_bg,
             ],
             outputs=state,
             queue=False,
@@ -441,11 +452,25 @@ class ICLightForge(scripts.Script):
             return
 
         device = get_torch_device()
-        input_rgb: np.ndarray = run_rmbg(self.args.input_fg)
+
+        if self.args.remove_bg:
+            input_rgb: np.ndarray = run_rmbg(self.args.input_fg)
+        else:
+            if len(self.args.input_fg.shape) < 3:
+                raise NotImplementedError
+            if self.args.input_fg.shape[-1] == 4:
+                input_rgb = make_masked_area_grey(
+                    self.args.input_fg[..., :3],
+                    self.args.input_fg[..., 3:].astype(np.float32) / 255.0,
+                )
+            else:
+                input_rgb = self.args.input_fg
 
         self.input_rgb = (
             input_rgb if (self.args.restore_detail and self.args.use_rmbg) else None
         )
+
+        assert input_rgb.shape[2] == 3
 
         work_model: ModelPatcher = p.sd_model.forge_objects.unet.clone()
         vae = p.sd_model.forge_objects.vae.clone()
