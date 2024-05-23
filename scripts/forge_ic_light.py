@@ -169,7 +169,7 @@ class ICLightArgs(BaseModel):
     enabled: bool = False
     model_type: ModelType = None
     restore_detail: bool = False
-    use_rmbg: bool = False
+    use_rmbg_for_restore: bool = False
     blur_radius: int = 5
     input_fg: Optional[np.ndarray] = None
     uploaded_bg: Optional[np.ndarray] = None
@@ -181,18 +181,18 @@ class ICLightArgs(BaseModel):
     def cls_decode_base64(cls, base64string: str) -> np.ndarray:
         return np.array(api.decode_base64_to_image(base64string)).astype("uint8")
 
-    @validator("input_fg", pre=True)
-    def parse_input_fg(cls, value) -> np.ndarray:
+    @validator("input_fg", "uploaded_bg", pre=True, allow_reuse=True)
+    def parse_image(cls, value) -> np.ndarray:
         if isinstance(value, str):
             return cls.cls_decode_base64(value)
         assert isinstance(value, np.ndarray) or value is None
         return value
 
-    @validator("uploaded_bg", pre=True)
-    def parse_input_bg(cls, value) -> np.ndarray:
+    @validator("model_type", pre=True, allow_reuse=True)
+    def parse_model_type(cls, value) -> ModelType:
         if isinstance(value, str):
-            return cls.cls_decode_base64(value)
-        assert isinstance(value, np.ndarray) or value is None
+            return ModelType.get(value)
+        assert isinstance(value, ModelType) or value is None
         return value
 
     @classmethod
@@ -205,7 +205,6 @@ class ICLightArgs(BaseModel):
         ][0]
 
         args = p.script_args[ic_light_script.args_from : ic_light_script.args_to]
-        args[0]["model_type"] = ModelType.get(args[0]["model_type"])
 
         assert len(args) == 1
         return ICLightArgs(**args[0])
@@ -458,7 +457,7 @@ class ICLightForge(scripts.Script):
         else:
             if len(self.args.input_fg.shape) < 3:
                 raise NotImplementedError
-            if self.args.input_fg.shape[-1] == 4:
+            if self.args.input_fg.shape[2] == 4:
                 input_rgb = make_masked_area_grey(
                     self.args.input_fg[..., :3],
                     self.args.input_fg[..., 3:].astype(np.float32) / 255.0,
@@ -467,7 +466,9 @@ class ICLightForge(scripts.Script):
                 input_rgb = self.args.input_fg
 
         self.input_rgb = (
-            input_rgb if (self.args.restore_detail and self.args.use_rmbg) else None
+            input_rgb
+            if (self.args.restore_detail and self.args.use_rmbg_for_restore)
+            else None
         )
 
         assert input_rgb.shape[2] == 3
@@ -499,7 +500,11 @@ class ICLightForge(scripts.Script):
         p.extra_result_images.append(
             restore_detail(
                 np.asarray(pp.image).astype(np.uint8),
-                self.input_rgb if self.args.use_rmbg else self.args.input_fg,
+                (
+                    self.input_rgb
+                    if self.args.use_rmbg_for_restore
+                    else self.args.input_fg
+                ),
                 int(self.args.blur_radius),
             )
         )
