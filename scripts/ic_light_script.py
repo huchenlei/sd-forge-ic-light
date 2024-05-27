@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 import gradio as gr
 import numpy as np
 from typing import Optional, Tuple
@@ -36,11 +37,29 @@ class A1111Context:
             setattr(self, id_mapping[elem_id], component)
 
 
+class BackendType(Enum):
+    A1111 = "A1111"
+    Forge = "Forge"
+
+
 class ICLightScript(scripts.Script):
     DEFAULT_ARGS = ICLightArgs(
         input_fg=np.zeros(shape=[1, 1, 1], dtype=np.uint8),
     )
     a1111_context = A1111Context()
+
+    def __init__(self) -> None:
+        super().__init__()
+        try:
+            from libiclight.forge_backend import apply_ic_light
+
+            self.apply_ic_light = apply_ic_light
+            self.backend_type = BackendType.Forge
+        except ImportError:
+            from libiclight.a1111_backend import apply_ic_light
+
+            self.apply_ic_light = apply_ic_light
+            self.backend_type = BackendType.A1111
 
     def title(self):
         return "IC Light"
@@ -184,17 +203,35 @@ class ICLightScript(scripts.Script):
 
         return (state,)
 
-    def process_before_every_sampling(
-        self, p: StableDiffusionProcessing, *args, **kwargs
-    ):
-        """Forge impl."""
+    def process(self, p: StableDiffusionProcessing, *args, **kwargs):
+        """
+        This function is called before processing begins for AlwaysVisible scripts.
+        You can modify the processing object (p) here, inject hooks, etc.
+        args contains all values returned by components from ui()
+
+        A1111 impl.
+        """
+        if self.backend_type != BackendType.A1111:
+            return
+
         args = ICLightArgs.fetch_from(p)
         if not args.enabled:
             return
+        self.apply_ic_light(p, args)
 
-        from libiclight.forge_backend import apply_ic_light
+    def process_before_every_sampling(
+        self, p: StableDiffusionProcessing, *args, **kwargs
+    ):
+        """
+        Forge impl.
 
-        apply_ic_light(p, args)
+        process_before_every_sampling is a forge-only hook.
+        """
+        assert self.backend_type == BackendType.Forge
+        args = ICLightArgs.fetch_from(p)
+        if not args.enabled:
+            return
+        self.apply_ic_light(p, args)
 
     @staticmethod
     def on_after_component(component, **_kwargs):
