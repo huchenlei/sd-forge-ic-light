@@ -29,7 +29,7 @@ def numpy2pytorch(imgs):
     return h
 
 
-def forge_numpy2pytorch(img: np.ndarray) -> torch.Tensor:
+def ldm_numpy2pytorch(img: np.ndarray) -> torch.Tensor:
     """Note: Forge/ComfyUI's VAE accepts 0 ~ 1 tensors."""
     return torch.from_numpy(img.astype(np.float32) / 255.0)
 

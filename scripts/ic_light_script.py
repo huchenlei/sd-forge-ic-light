@@ -27,7 +27,7 @@ from libiclight.utils import (
     make_masked_area_grey,
     run_rmbg,
     resize_and_center_crop,
-    forge_numpy2pytorch,
+    ldm_numpy2pytorch,
 )
 
 
@@ -235,7 +235,7 @@ class ICLightArgs(BaseModel):
             )
             np_concat = [fg, bg]
 
-        concat_conds = forge_numpy2pytorch(np.stack(np_concat, axis=0)).to(
+        concat_conds = ldm_numpy2pytorch(np.stack(np_concat, axis=0)).to(
             device=device, dtype=torch.float16
         )
 
@@ -245,7 +245,7 @@ class ICLightArgs(BaseModel):
         return {"samples": latent_concat_conds}
 
 
-class ICLightForge(scripts.Script):
+class ICLightScript(scripts.Script):
     DEFAULT_ARGS = ICLightArgs(
         input_fg=np.zeros(shape=[1, 1, 1], dtype=np.uint8),
     )
@@ -313,9 +313,9 @@ class ICLightForge(scripts.Script):
 
         state = gr.State({})
         (
-            ICLightForge.a1111_context.img2img_submit_button
+            ICLightScript.a1111_context.img2img_submit_button
             if is_img2img
-            else ICLightForge.a1111_context.txt2img_submit_button
+            else ICLightScript.a1111_context.txt2img_submit_button
         ).click(
             fn=lambda *args: {
                 k: v
@@ -351,17 +351,17 @@ class ICLightForge(scripts.Script):
             # FC need to change img2img input.
             for component in (
                 bg_source_fc,
-                ICLightForge.a1111_context.img2img_h_slider,
-                ICLightForge.a1111_context.img2img_w_slider,
+                ICLightScript.a1111_context.img2img_h_slider,
+                ICLightScript.a1111_context.img2img_w_slider,
             ):
                 component.change(
                     fn=update_img2img_input,
                     inputs=[
                         bg_source_fc,
-                        ICLightForge.a1111_context.img2img_h_slider,
-                        ICLightForge.a1111_context.img2img_w_slider,
+                        ICLightScript.a1111_context.img2img_h_slider,
+                        ICLightScript.a1111_context.img2img_w_slider,
                     ],
-                    outputs=ICLightForge.a1111_context.img2img_image,
+                    outputs=ICLightScript.a1111_context.img2img_image,
                 )
 
         def shift_enum_radios(model_type: str):
@@ -435,7 +435,7 @@ class ICLightForge(scripts.Script):
     @staticmethod
     def on_after_component(component, **_kwargs):
         """Register the A1111 component."""
-        ICLightForge.a1111_context.set_component(component)
+        ICLightScript.a1111_context.set_component(component)
 
 
-script_callbacks.on_after_component(ICLightForge.on_after_component)
+script_callbacks.on_after_component(ICLightScript.on_after_component)
