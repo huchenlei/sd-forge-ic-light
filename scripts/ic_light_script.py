@@ -130,13 +130,12 @@ class ICLightScript(scripts.Script):
             if is_img2img
             else ICLightScript.a1111_context.txt2img_submit_button
         ).click(
-            fn=lambda *args: {
-                k: v
-                for k, v in zip(
+            fn=lambda *args: dict(
+                zip(
                     vars(self.DEFAULT_ARGS).keys(),
                     args,
                 )
-            },
+            ),
             inputs=[
                 enabled,
                 model_type,
