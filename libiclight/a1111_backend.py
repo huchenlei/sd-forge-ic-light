@@ -1,45 +1,74 @@
 """ A1111 IC Light extension backend."""
 
 import os
+from typing import Callable
+import torch
 import numpy as np
 
+from modules import devices
 from modules.paths import models_path
+from modules.safe import unsafe_torch_load
 from modules.processing import StableDiffusionProcessing
 
-from ldm_patched.modules.utils import load_torch_file
-from ldm_patched.modules.model_patcher import ModelPatcher
-from ldm_patched.modules.sd import VAE
-from ldm_patched.modules.model_management import get_torch_device
+try:
+    from lib_modelpatcher.model_patcher import ModulePatch
+    from lib_modelpatcher.sd_model_patcher import StableDiffusionModelPatchers
+except ImportError as e:
+    print("Please install sd-webui-model-patcher")
+    raise e
 
 from .args import ICLightArgs
 from .ic_light_nodes import ICLight
+
+
+def vae_encode(sd_model, img: torch.Tensor) -> torch.Tensor:
+    """img: [B, C, H, W]"""
+    return sd_model.get_first_stage_encoding(sd_model.encode_first_stage(img))
 
 
 def apply_ic_light(
     p: StableDiffusionProcessing,
     args: ICLightArgs,
 ):
-    device = get_torch_device()
+    device = devices.get_device_for("ic_light")
+    dtype = devices.dtype_unet
 
     # Load model
     unet_path = os.path.join(models_path, "unet", args.model_type.model_name)
-    ic_model_state_dict = load_torch_file(unet_path, device=device)
+    ic_model_state_dict = unsafe_torch_load(unet_path, device=device)
 
     # Get input
     input_rgb: np.ndarray = args.get_input_rgb(device=device)
 
     # Apply IC Light
-    work_model: ModelPatcher = p.sd_model.forge_objects.unet.clone()
-    vae: VAE = p.sd_model.forge_objects.vae.clone()
-    node = ICLight()
-    patched_unet: ModelPatcher = node.apply(
-        model=work_model,
-        ic_model_state_dict=ic_model_state_dict,
-        c_concat=args.get_c_concat(input_rgb, vae, p, device=device),
-    )[0]
-    p.sd_model.forge_objects.unet = patched_unet
+    model_patchers: StableDiffusionModelPatchers = p.model_patchers
 
-    # Add input image to extra result images
-    is_hr_pass = getattr(p, "is_hr_pass", False)
-    if not is_hr_pass:
-        p.extra_result_images.append(input_rgb)
+    # [B, 4, H, W]
+    c_concat = vae_encode(p.sd_model, args.get_concat_cond(input_rgb, p))
+    # [1, 4 * B, H, W]
+    concat_conds = torch.cat([c[None, ...] for c in concat_conds], dim=1)
+
+    def apply_c_concat(unet, old_forward: Callable) -> Callable:
+        def new_forward(x, timesteps=None, context=None, **kwargs):
+            # Expand according to batch number.
+            c_concat = torch.cat(
+                ([concat_conds.to(x.device)] * (x.shape[0] // concat_conds.shape[0])),
+                dim=0,
+            )
+            new_x = torch.cat([x] + c_concat, dim=1)
+            return old_forward(new_x, timesteps, context, **kwargs)
+
+        return new_forward
+
+    # Patch unet forward.
+    model_patchers.unet_patcher.add_module_patch(
+        ".", ModulePatch(create_new_forward_func=apply_c_concat)
+    )
+
+    # Note: no need to prefix with "diffusion_model." as unet is the root module.
+    model_patchers.unet_patcher.add_patches(
+        patches={
+            key: (value.to(dtype=dtype, device=device),)
+            for key, value in ic_model_state_dict.items()
+        }
+    )

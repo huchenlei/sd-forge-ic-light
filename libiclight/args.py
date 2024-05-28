@@ -164,13 +164,11 @@ class ICLightArgs(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    def get_c_concat(
+    def get_concat_cond(
         self,
         processed_fg: np.ndarray,  # fg with bg removed.
-        vae,
         p: StableDiffusionProcessing,
-        device: torch.device,
-    ) -> dict:
+    ) -> torch.Tensor:
         is_hr_pass = getattr(p, "is_hr_pass", False)
         if is_hr_pass:
             assert isinstance(p, StableDiffusionProcessingTxt2Img)
@@ -198,14 +196,7 @@ class ICLightArgs(BaseModel):
             )
             np_concat = [fg, bg]
 
-        concat_conds = ldm_numpy2pytorch(np.stack(np_concat, axis=0)).to(
-            device=device, dtype=torch.float16
-        )
-
-        # Optional: Use mode instead of sample from VAE output.
-        # vae.first_stage_model.regularization.sample = False
-        latent_concat_conds = vae.encode(concat_conds)
-        return {"samples": latent_concat_conds}
+        return ldm_numpy2pytorch(np.stack(np_concat, axis=0))
 
     def get_input_rgb(self, device: torch.device) -> np.ndarray:
         if self.remove_bg:

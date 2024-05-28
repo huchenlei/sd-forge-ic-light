@@ -2,6 +2,7 @@
 
 import os
 import numpy as np
+import torch
 
 from modules.paths import models_path
 from modules.processing import StableDiffusionProcessing
@@ -35,7 +36,13 @@ def apply_ic_light(
     patched_unet: ModelPatcher = node.apply(
         model=work_model,
         ic_model_state_dict=ic_model_state_dict,
-        c_concat=args.get_c_concat(input_rgb, vae, p, device=device),
+        c_concat={
+            "samples": vae.encode(
+                args.get_concat_cond(input_rgb, p).to(
+                    device=vae.device, dtype=torch.float16
+                )
+            )
+        },
     )[0]
     p.sd_model.forge_objects.unet = patched_unet
 
