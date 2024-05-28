@@ -18,7 +18,6 @@ except ImportError as e:
     raise e
 
 from .args import ICLightArgs
-from .ic_light_nodes import ICLight
 
 
 def vae_encode(sd_model, img: torch.Tensor) -> torch.Tensor:
