@@ -32,7 +32,9 @@ def numpy2pytorch(imgs):
 
 def ldm_numpy2pytorch(img: np.ndarray) -> torch.Tensor:
     """Note: Forge/ComfyUI's VAE accepts 0 ~ 1 tensors."""
-    return torch.from_numpy(img.astype(np.float32) / 255.0)
+    h = torch.from_numpy(img.astype(np.float32) / 255.0)
+    h = h.movedim(-1, 1)
+    return h
 
 
 def resize_and_center_crop(image, target_width, target_height):
@@ -86,7 +88,9 @@ class BriarmbgService:
         self.rmbg_model = BriaRMBG.from_pretrained("briaai/RMBG-1.4")
 
     @torch.inference_mode()
-    def run_rmbg(self, img, device=torch.device("cuda")) -> np.ndarray:
+    def run_rmbg(self, img, device=None) -> np.ndarray:
+        if device is None:
+            device = torch.device("cuda")
         H, W, C = img.shape
         assert C == 3
         k = (256.0 / float(H * W)) ** 0.5

@@ -169,6 +169,7 @@ class ICLightArgs(BaseModel):
         processed_fg: np.ndarray,  # fg with bg removed.
         p: StableDiffusionProcessing,
     ) -> torch.Tensor:
+        """ Returns concat condition in [B, C=4, H, W] format."""
         is_hr_pass = getattr(p, "is_hr_pass", False)
         if is_hr_pass:
             assert isinstance(p, StableDiffusionProcessingTxt2Img)
@@ -199,6 +200,7 @@ class ICLightArgs(BaseModel):
         return ldm_numpy2pytorch(np.stack(np_concat, axis=0))
 
     def get_input_rgb(self, device: torch.device) -> np.ndarray:
+        """Returns rgb image in format [H, W, C=3]"""
         if self.remove_bg:
             input_fg = self.input_fg[..., :3]
             alpha = BriarmbgService().run_rmbg(img=input_fg, device=device)
