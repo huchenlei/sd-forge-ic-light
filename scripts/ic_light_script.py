@@ -210,6 +210,10 @@ class ICLightScript(scripts.Script):
         args contains all values returned by components from ui()
 
         A1111 impl.
+        Known issue: Currently does not support hires-fix.
+        TODO:
+        - process_before_every_sampling hook
+        - find a better place to call model_patcher.patch_model()
         """
         if self.backend_type != BackendType.A1111:
             return
