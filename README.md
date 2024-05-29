@@ -1,8 +1,13 @@
 # sd-forge-ic-light
-SD Forge extension for [IC-Light](https://github.com/lllyasviel/IC-Light). This extension is based on https://github.com/huchenlei/ComfyUI-IC-Light-Native.
+A1111/SD Forge extension for [IC-Light](https://github.com/lllyasviel/IC-Light). Forge backend is based on https://github.com/huchenlei/ComfyUI-IC-Light-Native.
 
 ## Install
+### SD Forge
 ![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/608fbe20-1430-4efa-93bc-166f629eaaa5)
+### A1111
+- Install https://github.com/huchenlei/sd-webui-model-patcher first as it provides the `ModelPatcher` interface.
+- Install the extension the same way as SD Forge
+- [**Known issue**]: HR does not workn for A1111 yet.
 
 ### Download models
 IC-Light main repo is based on diffusers. In order to load it with UnetLoader in Forge, state_dict keys need to convert to ldm format. You can download models with ldm keys here: https://huggingface.co/huchenlei/IC-Light-ldm/tree/main
