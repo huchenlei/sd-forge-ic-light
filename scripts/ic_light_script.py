@@ -6,7 +6,7 @@ from typing import Optional, Tuple
 
 from modules import scripts, script_callbacks
 from modules.ui_components import InputAccordion
-from modules.processing import StableDiffusionProcessing
+from modules.processing import StableDiffusionProcessing, StableDiffusionProcessingTxt2Img
 
 from libiclight.args import ICLightArgs, BGSourceFC, BGSourceFBC, ModelType
 
@@ -220,6 +220,10 @@ class ICLightScript(scripts.Script):
         args = ICLightArgs.fetch_from(p)
         if not args.enabled:
             return
+
+        if isinstance(p, StableDiffusionProcessingTxt2Img) and p.enable_hr:
+            raise NotImplementedError("Hires-fix is not yet supported in A1111.")
+
         self.apply_ic_light(p, args)
 
     def process_before_every_sampling(
