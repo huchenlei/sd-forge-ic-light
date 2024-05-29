@@ -17,10 +17,16 @@ except ImportError as e:
     raise e
 
 from .args import ICLightArgs
+from .utils import numpy2pytorch
 
 
 def vae_encode(sd_model, img: torch.Tensor) -> torch.Tensor:
-    """img: [B, C, H, W]"""
+    """
+    img: [B, C, H, W] format tensor. Value from -1.0 to 1.0.
+    Return tensor in [B, C, H, W] format.
+
+    Note: Input img format differs from forge/comfy's vae input format.
+    """
     return sd_model.get_first_stage_encoding(sd_model.encode_first_stage(img))
 
 
@@ -41,7 +47,9 @@ def apply_ic_light(
     # [B, 4, H, W]
     concat_conds = vae_encode(
         p.sd_model,
-        args.get_concat_cond(input_rgb, p).to(dtype=devices.dtype_vae, device=device),
+        numpy2pytorch(args.get_concat_cond(input_rgb, p)).to(
+            dtype=devices.dtype_vae, device=device
+        ),
     ).to(dtype=devices.dtype_unet)
     # [1, 4 * B, H, W]
     concat_conds = torch.cat([c[None, ...] for c in concat_conds], dim=1)

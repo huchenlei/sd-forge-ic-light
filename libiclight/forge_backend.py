@@ -14,6 +14,7 @@ from ldm_patched.modules.model_management import get_torch_device
 
 from .args import ICLightArgs
 from .ic_light_nodes import ICLight
+from .utils import forge_numpy2pytorch
 
 
 def apply_ic_light(
@@ -37,8 +38,10 @@ def apply_ic_light(
         model=work_model,
         ic_model_state_dict=ic_model_state_dict,
         c_concat={
+            # Note: VAE input value from 0.0 to 1.0.
+            # This differs from A1111/diffusers vae input format.
             "samples": vae.encode(
-                args.get_concat_cond(input_rgb, p).to(
+                forge_numpy2pytorch(args.get_concat_cond(input_rgb, p)).to(
                     device=vae.device, dtype=torch.float16
                 )
             )

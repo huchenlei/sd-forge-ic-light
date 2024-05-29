@@ -16,7 +16,6 @@ from libiclight.utils import (
     align_dim_latent,
     make_masked_area_grey,
     resize_and_center_crop,
-    ldm_numpy2pytorch,
 )
 
 
@@ -168,8 +167,8 @@ class ICLightArgs(BaseModel):
         self,
         processed_fg: np.ndarray,  # fg with bg removed.
         p: StableDiffusionProcessing,
-    ) -> torch.Tensor:
-        """ Returns concat condition in [B, C=4, H, W] format."""
+    ) -> np.ndarray:
+        """ Returns concat condition in [B, H, W, C] format."""
         is_hr_pass = getattr(p, "is_hr_pass", False)
         if is_hr_pass:
             assert isinstance(p, StableDiffusionProcessingTxt2Img)
@@ -197,7 +196,7 @@ class ICLightArgs(BaseModel):
             )
             np_concat = [fg, bg]
 
-        return ldm_numpy2pytorch(np.stack(np_concat, axis=0))
+        return np.stack(np_concat, axis=0)
 
     def get_input_rgb(self, device: torch.device) -> np.ndarray:
         """Returns rgb image in format [H, W, C=3]"""

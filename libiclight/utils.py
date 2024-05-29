@@ -23,6 +23,7 @@ def pytorch2numpy(imgs, quant=True):
 
 @torch.inference_mode()
 def numpy2pytorch(imgs):
+    """Note: A1111's VAE accepts -1 ~ 1 tensors."""
     h = (
         torch.from_numpy(np.stack(imgs, axis=0)).float() / 127.0 - 1.0
     )  # so that 127 must be strictly 0.0
@@ -30,7 +31,8 @@ def numpy2pytorch(imgs):
     return h
 
 
-def ldm_numpy2pytorch(img: np.ndarray) -> torch.Tensor:
+@torch.inference_mode()
+def forge_numpy2pytorch(img: np.ndarray) -> torch.Tensor:
     """Note: Forge/ComfyUI's VAE accepts 0 ~ 1 tensors."""
     h = torch.from_numpy(img.astype(np.float32) / 255.0)
     h = h.movedim(-1, 1)
