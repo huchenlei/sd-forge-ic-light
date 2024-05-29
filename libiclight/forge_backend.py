@@ -34,18 +34,19 @@ def apply_ic_light(
     work_model: ModelPatcher = p.sd_model.forge_objects.unet.clone()
     vae: VAE = p.sd_model.forge_objects.vae.clone()
     node = ICLight()
+
+    # [B, C, H, W]
+    pixel_concat = forge_numpy2pytorch(args.get_concat_cond(input_rgb, p)).to(
+        device=vae.device, dtype=torch.float16
+    )
+    # [B, H, W, C]
+    # Forge/ComfyUI's VAE accepts [B, H, W, C] format.
+    pixel_concat = pixel_concat.movedim(1, 3)
+
     patched_unet: ModelPatcher = node.apply(
         model=work_model,
         ic_model_state_dict=ic_model_state_dict,
-        c_concat={
-            # Note: VAE input value from 0.0 to 1.0.
-            # This differs from A1111/diffusers vae input format.
-            "samples": vae.encode(
-                forge_numpy2pytorch(args.get_concat_cond(input_rgb, p)).to(
-                    device=vae.device, dtype=torch.float16
-                )
-            )
-        },
+        c_concat={"samples": vae.encode(pixel_concat)},
     )[0]
     p.sd_model.forge_objects.unet = patched_unet
 
