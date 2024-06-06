@@ -17,7 +17,6 @@ from pydantic import BaseModel, validator
 from typing import Optional
 from enum import Enum
 import numpy as np
-import torch
 
 
 class BGSourceFC(Enum):
@@ -34,7 +33,6 @@ class BGSourceFC(Enum):
         self,
         image_width: int,
         image_height: int,
-        **kwargs,
     ) -> np.ndarray:
 
         match self:
@@ -180,7 +178,6 @@ class ICLightArgs(BaseModel):
 
         if getattr(p, "is_hr_pass", False):
             assert isinstance(p, StableDiffusionProcessingTxt2Img)
-            # TODO: Move the calculation to Forge main repo.
             if p.hr_resize_x == 0 and p.hr_resize_y == 0:
                 hr_x = int(p.width * p.hr_scale)
                 hr_y = int(p.height * p.hr_scale)
@@ -212,7 +209,7 @@ class ICLightArgs(BaseModel):
 
         return np.stack(np_concat, axis=0)
 
-    def get_input_rgb(self, device: torch.device = None) -> np.ndarray:
+    def get_input_rgb(self, device=None) -> np.ndarray:
         """Returns rgb image in format [H, W, C=3]"""
         if self.remove_bg:
             input_rgb: np.ndarray = run_rmbg(self.input_fg)

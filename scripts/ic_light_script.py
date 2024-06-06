@@ -201,6 +201,13 @@ class ICLightScript(scripts.Script):
                 outputs=[input_fg],
             )
 
+            input_fg.upload(
+                fn=lambda: gr.update(value=BGSourceFC.CUSTOM),
+                inputs=None,
+                outputs=[bg_source_fc],
+                show_progress="hidden",
+            )
+
         else:
 
             def on_model_change(model_type: str):
@@ -291,6 +298,11 @@ class ICLightScript(scripts.Script):
         )
 
     def postprocess(self, p, processed, *args, **kwargs):
+        if (self.args is None) or (not self.args.enabled):
+            return
+        if self.backend_type == BackendType.A1111:
+            if getattr(p, "extra_result_images", None):
+                processed.images += p.extra_result_images
         if self.detailed_images:
             processed.images += self.detailed_images
 

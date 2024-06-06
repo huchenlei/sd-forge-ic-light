@@ -1,12 +1,10 @@
 from modules.processing import StableDiffusionProcessing
-from modules.paths import models_path
 from modules import devices
 
 from typing import Callable
 import safetensors.torch
 import numpy as np
 import torch
-import os
 
 try:
     from lib_modelpatcher.model_patcher import ModulePatch
@@ -19,14 +17,14 @@ from .args import ICLightArgs
 from .utils import numpy2pytorch
 
 
-def vae_encode(sd_model, img: torch.Tensor) -> torch.Tensor:
+def vae_encode(sd_model, image: torch.Tensor) -> torch.Tensor:
     """
-    img: [B, C, H, W] format tensor. Value from -1.0 to 1.0.
-    Return tensor in [B, C, H, W] format.
+    image: [B, C, H, W] format tensor. Value from -1.0 to 1.0
+    Return: tensor in [B, C, H, W] format
 
-    Note: Input img format differs from forge/comfy's vae input format.
+    Note: Input image format differs from forge/comfy's vae input format
     """
-    return sd_model.get_first_stage_encoding(sd_model.encode_first_stage(img))
+    return sd_model.get_first_stage_encoding(sd_model.encode_first_stage(image))
 
 
 def apply_ic_light(
@@ -77,3 +75,11 @@ def apply_ic_light(
             for key, value in ic_model_state_dict.items()
         }
     )
+
+    # Add input image to extra result images
+    if not getattr(p, "is_hr_pass", False):
+        if not getattr(p, "extra_result_images", None):
+            p.extra_result_images = [input_rgb]
+        else:
+            assert isinstance(p.extra_result_images, list)
+            p.extra_result_images.append(input_rgb)

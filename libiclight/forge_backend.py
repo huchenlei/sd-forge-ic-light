@@ -1,9 +1,7 @@
 from modules.processing import StableDiffusionProcessing
-from modules.paths import models_path
 
 import numpy as np
 import torch
-import os
 
 from ldm_patched.modules.model_management import get_torch_device
 from ldm_patched.modules.model_patcher import ModelPatcher
@@ -48,5 +46,5 @@ def apply_ic_light(
     p.sd_model.forge_objects.unet = patched_unet
 
     # Add input image to extra result images
-    # if not getattr(p, "is_hr_pass", False):
-    #     p.extra_result_images.append(input_rgb)
+    if not getattr(p, "is_hr_pass", False):
+        p.extra_result_images.append(input_rgb)
