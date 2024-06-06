@@ -195,14 +195,17 @@ class ICLightScript(scripts.Script):
 
                 return gr.update(value=bg_source_fc.get_bg(512, 512))
 
-            bg_source_fc.change(
+            bg_source_fc.input(
                 fn=update_img2img_input,
                 inputs=[bg_source_fc],
                 outputs=[input_fg],
             )
 
+            def set_img2img_mode():
+                return gr.update(value=BGSourceFC.CUSTOM)
+
             input_fg.upload(
-                fn=lambda: gr.update(value=BGSourceFC.CUSTOM),
+                fn=set_img2img_mode,
                 inputs=None,
                 outputs=[bg_source_fc],
                 show_progress="hidden",
