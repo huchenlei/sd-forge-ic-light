@@ -104,7 +104,7 @@ class ICLightScript(scripts.Script):
                 input_fg = gr.Image(
                     source="upload",
                     type="numpy",
-                    label=("Lighting Conditioning" if is_img2img else "Foreground"),
+                    label="Foreground",
                     height=480,
                     interactive=True,
                     visible=True,
