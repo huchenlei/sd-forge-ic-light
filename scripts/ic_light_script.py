@@ -95,7 +95,10 @@ class ICLightScript(scripts.Script):
                     interactive=(not is_img2img),
                 )
 
-                desc = gr.Markdown(i2i_fc if is_img2img else t2i_fc)
+                desc = gr.Markdown(
+                    value=i2i_fc if is_img2img else t2i_fc,
+                    elem_classes=["ic-light-desc"],
+                )
 
             with gr.Row():
                 input_fg = gr.Image(
