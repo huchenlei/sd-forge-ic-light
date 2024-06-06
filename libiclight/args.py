@@ -5,7 +5,7 @@ from modules.processing import (
     StableDiffusionProcessingTxt2Img,
 )
 
-from scripts.model_loader import ModelType
+from libiclight.model_loader import ModelType
 from libiclight.rembg_utils import run_rmbg
 from libiclight.utils import (
     align_dim_latent,

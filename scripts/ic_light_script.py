@@ -1,14 +1,14 @@
 from modules import scripts, script_callbacks
 from modules.ui_components import InputAccordion
+from modules.paths import models_path
 from modules.processing import (
     StableDiffusionProcessing,
     StableDiffusionProcessingTxt2Img,
     StableDiffusionProcessingImg2Img,
 )
 
-from scripts.model_loader import ModelType
-from scripts.ic_modes import t2i_fc, t2i_fbc, i2i_fc
-
+from libiclight.model_loader import ModelType, detect_models
+from libiclight.ic_modes import t2i_fc, t2i_fbc, i2i_fc
 from libiclight.detail_utils import restore_detail
 from libiclight.args import ICLightArgs, BGSourceFC, BGSourceFBC
 
@@ -319,3 +319,4 @@ class ICLightScript(scripts.Script):
 
 
 script_callbacks.on_after_component(ICLightScript.on_after_component)
+script_callbacks.on_before_ui(lambda: detect_models(models_path))

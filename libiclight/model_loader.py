@@ -1,5 +1,3 @@
-from modules.script_callbacks import on_before_ui
-from modules.paths import models_path
 from enum import Enum
 import os
 
@@ -9,7 +7,7 @@ FC_PATH: str = None
 FBC_PATH: str = None
 
 
-def detect_models():
+def detect_models(models_path: str):
     global FC_NAME, FBC_NAME, FC_PATH, FBC_PATH
     folder = os.path.join(models_path, "ic-light")
 
@@ -71,6 +69,3 @@ class ModelType(Enum):
                 return FBC_PATH
             case _:
                 raise SystemError
-
-
-on_before_ui(detect_models)
