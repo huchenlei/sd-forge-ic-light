@@ -23,7 +23,7 @@ def apply_ic_light(
     ic_model_state_dict = load_torch_file(args.model_type.path, device=device)
 
     # Get input
-    input_rgb: np.ndarray = args.get_input_rgb(device=device)
+    input_fg_rgb: np.ndarray = args.input_fg_rgb
 
     # Apply IC Light
     work_model: ModelPatcher = p.sd_model.forge_objects.unet.clone()
@@ -31,7 +31,7 @@ def apply_ic_light(
     node = ICLight()
 
     # [B, C, H, W]
-    pixel_concat = forge_numpy2pytorch(args.get_concat_cond(input_rgb, p)).to(
+    pixel_concat = forge_numpy2pytorch(args.get_concat_cond(input_fg_rgb, p)).to(
         device=vae.device, dtype=torch.float16
     )
     # [B, H, W, C]
@@ -47,4 +47,4 @@ def apply_ic_light(
 
     # Add input image to extra result images
     if not getattr(p, "is_hr_pass", False):
-        p.extra_result_images.append(input_rgb)
+        p.extra_result_images.append(input_fg_rgb)

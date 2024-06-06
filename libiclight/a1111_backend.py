@@ -38,12 +38,12 @@ def apply_ic_light(
     ic_model_state_dict = safetensors.torch.load_file(args.model_type.path)
 
     # Get input
-    input_rgb: np.ndarray = args.get_input_rgb(device=device)
+    input_fg_rgb: np.ndarray = args.input_fg_rgb
 
     # [B, 4, H, W]
     concat_conds = vae_encode(
         p.sd_model,
-        numpy2pytorch(args.get_concat_cond(input_rgb, p)).to(
+        numpy2pytorch(args.get_concat_cond(input_fg_rgb, p)).to(
             dtype=devices.dtype_vae, device=device
         ),
     ).to(dtype=devices.dtype_unet)
@@ -79,7 +79,7 @@ def apply_ic_light(
     # Add input image to extra result images
     if not getattr(p, "is_hr_pass", False):
         if not getattr(p, "extra_result_images", None):
-            p.extra_result_images = [input_rgb]
+            p.extra_result_images = [input_fg_rgb]
         else:
             assert isinstance(p.extra_result_images, list)
-            p.extra_result_images.append(input_rgb)
+            p.extra_result_images.append(input_fg_rgb)

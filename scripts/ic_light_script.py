@@ -52,7 +52,7 @@ class A1111Context:
 
 
 class ICLightScript(scripts.Script):
-    DEFAULT_ARGS = ICLightArgs(input_fg=np.zeros((1, 1, 1), dtype=np.uint8))
+    DEFAULT_ARGS = ICLightArgs()
     a1111_context = A1111Context()
 
     def __init__(self) -> None:
@@ -119,12 +119,21 @@ class ICLightScript(scripts.Script):
                     visible=False,
                 )
 
-            remove_bg = gr.Checkbox(
-                label="Background Removal",
-                info="Disable if you already have a subject with the background removed",
-                value=True,
-                interactive=True,
-            )
+            with gr.Row():
+                remove_bg = gr.Checkbox(
+                    label="Background Removal",
+                    info="Disable if you already have a subject with the background removed",
+                    value=True,
+                    interactive=True,
+                )
+
+                reinforce_fg = gr.Checkbox(
+                    label="Reinforce Foreground",
+                    info="Preserve the foreground base color",
+                    value=False,
+                    interactive=True,
+                    visible=is_img2img,
+                )
 
             bg_source_fc = gr.Radio(
                 label="Background Source",
@@ -146,13 +155,13 @@ class ICLightScript(scripts.Script):
                 interactive=True,
             )
 
-            with InputAccordion(value=False, label="Restore Details") as restore_detail:
+            with InputAccordion(value=False, label="Restore Details") as detail_transfer:
 
-                use_rmbg = gr.Checkbox(
+                detail_transfer_use_raw_input = gr.Checkbox(
                     label="Use the [Image with Background Removed] instead of the [Original Input]"
                 )
 
-                blur_radius = gr.Slider(
+                detail_transfer_blur_radius = gr.Slider(
                     label="Blur Radius",
                     info="for Difference of Gaussian",
                     minimum=1,
@@ -176,14 +185,15 @@ class ICLightScript(scripts.Script):
             inputs=[
                 enabled,
                 model_type,
-                restore_detail,
-                use_rmbg,
-                blur_radius,
                 input_fg,
                 uploaded_bg,
                 bg_source_fc,
                 bg_source_fbc,
                 remove_bg,
+                reinforce_fg,
+                detail_transfer,
+                detail_transfer_use_raw_input,
+                detail_transfer_blur_radius,
             ],
             outputs=state,
             queue=False,
@@ -201,13 +211,13 @@ class ICLightScript(scripts.Script):
             bg_source_fc.input(
                 fn=update_img2img_input,
                 inputs=[bg_source_fc],
-                outputs=[input_fg],
+                outputs=[ICLightScript.a1111_context.img2img_image],
             )
 
             def set_img2img_mode():
                 return gr.update(value=BGSourceFC.CUSTOM)
 
-            input_fg.upload(
+            ICLightScript.a1111_context.img2img_image.upload(
                 fn=set_img2img_mode,
                 inputs=None,
                 outputs=[bg_source_fc],
@@ -250,9 +260,7 @@ class ICLightScript(scripts.Script):
             return
 
         if isinstance(p, StableDiffusionProcessingImg2Img):
-            input_image = np.asarray(p.init_images[0]).astype(np.uint8)
-            p.init_images[0] = Image.fromarray(args.input_fg)
-            args.input_fg = input_image
+            p.init_images[0] = Image.fromarray(args.get_lightmap(p))
 
         self.args = args
 
@@ -287,7 +295,7 @@ class ICLightScript(scripts.Script):
         if (
             (self.args is None)
             or (not self.args.enabled)
-            or (not self.args.restore_detail)
+            or (not self.args.detail_transfer)
         ):
             return
 
@@ -295,11 +303,11 @@ class ICLightScript(scripts.Script):
             restore_detail(
                 np.asarray(pp.image).astype(np.uint8),
                 (
-                    self.args.get_input_rgb()
-                    if self.args.use_rmbg_for_restore
-                    else self.args.input_fg
+                    self.args.input_fg
+                    if self.args.detail_transfer_use_raw_input
+                    else self.args.input_fg_rgb
                 ),
-                int(self.args.blur_radius),
+                int(self.args.detail_transfer_blur_radius),
             )
         )
 

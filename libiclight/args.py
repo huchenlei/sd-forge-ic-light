@@ -2,6 +2,7 @@ from modules import scripts
 from modules.api import api
 from modules.processing import (
     StableDiffusionProcessing,
+    StableDiffusionProcessingImg2Img,
     StableDiffusionProcessingTxt2Img,
 )
 
@@ -13,7 +14,7 @@ from libiclight.utils import (
     resize_and_center_crop,
 )
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, root_validator, validator
 from typing import Optional
 from enum import Enum
 import numpy as np
@@ -27,6 +28,7 @@ class BGSourceFC(Enum):
     RIGHT = "Right Light"
     TOP = "Top Light"
     BOTTOM = "Bottom Light"
+    GREY = "Ambient"
     CUSTOM = "Custom LightMap"
 
     def get_bg(
@@ -56,6 +58,11 @@ class BGSourceFC(Enum):
                 gradient = np.linspace(0, 255, image_height)[:, None]
                 image = np.tile(gradient, (1, image_width))
                 input_bg = np.stack((image,) * 3, axis=-1).astype(np.uint8)
+
+            case BGSourceFC.GREY:
+                input_bg = (
+                    np.zeros(shape=(image_height, image_width, 3), dtype=np.uint8) + 127
+                )
 
             case _:
                 raise NotImplementedError("Wrong initial latent!")
@@ -125,14 +132,24 @@ class BGSourceFBC(Enum):
 class ICLightArgs(BaseModel):
     enabled: bool = False
     model_type: ModelType = None
-    restore_detail: bool = False
-    use_rmbg_for_restore: bool = False
-    blur_radius: int = 5
     input_fg: Optional[np.ndarray] = None
     uploaded_bg: Optional[np.ndarray] = None
     bg_source_fc: BGSourceFC = BGSourceFC.NONE
     bg_source_fbc: BGSourceFBC = BGSourceFBC.UPLOAD
     remove_bg: bool = True
+    # FC model only option. Overlay the FG image on top of the light map
+    # in order to better preserve FG's base color.
+    reinforce_fg: bool = True
+    # Transfer high frequency detail from input image to the output.
+    # This can better preserve the details such as text.
+    detail_transfer: bool = False
+    # Whether to use raw input for detail transfer.
+    detail_transfer_use_raw_input: bool = False
+    # Blur radius for detail transfer.
+    detail_transfer_blur_radius: int = 5
+
+    # Calculated value of the input fg with alpha channel filled with grey.
+    input_fg_rgb: Optional[np.ndarray] = None
 
     @classmethod
     def cls_decode_base64(cls, base64string: str) -> np.ndarray:
@@ -151,6 +168,32 @@ class ICLightArgs(BaseModel):
             return ModelType.get(value)
         assert isinstance(value, ModelType) or value is None
         return value
+
+    @root_validator
+    def process_input_fg(cls, values: dict) -> dict:
+        """Process input fg image into format [H, W, C=3]"""
+        input_fg = values.get("input_fg")
+        remove_bg: bool = values.get("remove_bg")
+        # Default args.
+        if input_fg is None:
+            return values
+
+        if remove_bg:
+            input_fg_rgb: np.ndarray = run_rmbg(input_fg)
+        else:
+            if len(input_fg.shape) < 3:
+                raise NotImplementedError("Does not support L Images...")
+            if input_fg.shape[-1] == 4:
+                input_fg_rgb = make_masked_area_grey(
+                    input_fg[..., :3],
+                    input_fg[..., 3:].astype(np.float32) / 255.0,
+                )
+            else:
+                input_fg_rgb = input_fg
+
+        assert input_fg_rgb.shape[2] == 3, "Input Image should be in RGB channels."
+        values["input_fg_rgb"] = input_fg_rgb
+        return values
 
     @classmethod
     def fetch_from(cls, p: StableDiffusionProcessing):
@@ -209,21 +252,22 @@ class ICLightArgs(BaseModel):
 
         return np.stack(np_concat, axis=0)
 
-    def get_input_rgb(self, device=None) -> np.ndarray:
-        """Returns rgb image in format [H, W, C=3]"""
-        if self.remove_bg:
-            input_rgb: np.ndarray = run_rmbg(self.input_fg)
-        else:
-            if len(self.input_fg.shape) < 3:
-                raise NotImplementedError("Does not support L Images...")
-            if self.input_fg.shape[-1] == 4:
-                input_rgb = make_masked_area_grey(
-                    self.input_fg[..., :3],
-                    self.input_fg[..., 3:].astype(np.float32) / 255.0,
-                )
-            else:
-                input_rgb = self.input_fg
+    def get_lightmap(self, p: StableDiffusionProcessingImg2Img) -> np.ndarray:
+        assert self.model_type == ModelType.FC
+        assert isinstance(p, StableDiffusionProcessingImg2Img)
+        lightmap = np.asarray(p.init_images[0]).astype(np.uint8)
+        if self.reinforce_fg:
+            rgb_fg = self.input_fg_rgb
+            mask = np.all(rgb_fg == np.array([127, 127, 127]), axis=-1)
+            mask = mask[..., None]  # [H, W, 1]
+            lightmap = resize_and_center_crop(
+                lightmap, target_width=rgb_fg.shape[1], target_height=rgb_fg.shape[0]
+            )
+            lightmap_rgb = lightmap[..., :3]
+            lightmap_alpha = lightmap[..., 3:4]
+            lightmap_rgb = rgb_fg * (1 - mask) + lightmap_rgb * mask
+            lightmap = np.concatenate([lightmap_rgb, lightmap_alpha], axis=-1).astype(
+                np.uint8
+            )
 
-        assert input_rgb.shape[2] == 3, "Input Image should be in RGB channels."
-
-        return input_rgb
+        return lightmap
