@@ -1,33 +1,30 @@
-""" A1111 IC Light extension backend."""
-
-import os
-from typing import Callable
-import torch
-import numpy as np
-import safetensors.torch
-
-from modules import devices
-from modules.paths import models_path
 from modules.processing import StableDiffusionProcessing
+from modules import devices
+
+from typing import Callable
+import safetensors.torch
+import numpy as np
+import torch
 
 try:
     from lib_modelpatcher.model_patcher import ModulePatch
 except ImportError as e:
-    print("Please install sd-webui-model-patcher")
+    print("Please install [sd-webui-model-patcher] first!")
+    print("https://github.com/huchenlei/sd-webui-model-patcher")
     raise e
 
 from .args import ICLightArgs
 from .utils import numpy2pytorch
 
 
-def vae_encode(sd_model, img: torch.Tensor) -> torch.Tensor:
+def vae_encode(sd_model, image: torch.Tensor) -> torch.Tensor:
     """
-    img: [B, C, H, W] format tensor. Value from -1.0 to 1.0.
-    Return tensor in [B, C, H, W] format.
+    image: [B, C, H, W] format tensor. Value from -1.0 to 1.0
+    Return: tensor in [B, C, H, W] format
 
-    Note: Input img format differs from forge/comfy's vae input format.
+    Note: Input image format differs from forge/comfy's vae input format
     """
-    return sd_model.get_first_stage_encoding(sd_model.encode_first_stage(img))
+    return sd_model.get_first_stage_encoding(sd_model.encode_first_stage(image))
 
 
 def apply_ic_light(
@@ -38,19 +35,19 @@ def apply_ic_light(
     dtype = devices.dtype_unet
 
     # Load model
-    unet_path = os.path.join(models_path, "unet", args.model_type.model_name)
-    ic_model_state_dict = safetensors.torch.load_file(unet_path)
+    ic_model_state_dict = safetensors.torch.load_file(args.model_type.path)
 
     # Get input
-    input_rgb: np.ndarray = args.get_input_rgb(device=device)
+    input_fg_rgb: np.ndarray = args.input_fg_rgb
 
     # [B, 4, H, W]
     concat_conds = vae_encode(
         p.sd_model,
-        numpy2pytorch(args.get_concat_cond(input_rgb, p)).to(
+        numpy2pytorch(args.get_concat_cond(input_fg_rgb, p)).to(
             dtype=devices.dtype_vae, device=device
         ),
     ).to(dtype=devices.dtype_unet)
+
     # [1, 4 * B, H, W]
     concat_conds = torch.cat([c[None, ...] for c in concat_conds], dim=1)
 
@@ -70,6 +67,7 @@ def apply_ic_light(
     p.model_patcher.add_module_patch(
         "diffusion_model", ModulePatch(create_new_forward_func=apply_c_concat)
     )
+
     # Patch weights.
     p.model_patcher.add_patches(
         patches={
@@ -77,3 +75,11 @@ def apply_ic_light(
             for key, value in ic_model_state_dict.items()
         }
     )
+
+    # Add input image to extra result images
+    if not getattr(p, "is_hr_pass", False):
+        if not getattr(p, "extra_result_images", None):
+            p.extra_result_images = [input_fg_rgb]
+        else:
+            assert isinstance(p.extra_result_images, list)
+            p.extra_result_images.append(input_fg_rgb)

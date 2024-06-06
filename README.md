@@ -1,31 +1,25 @@
-# sd-forge-ic-light
-A1111/SD Forge extension for [IC-Light](https://github.com/lllyasviel/IC-Light). Forge backend is based on https://github.com/huchenlei/ComfyUI-IC-Light-Native.
+# SD Forge IC-Light
+This is an Extension for the [Forge Webui](https://github.com/lllyasviel/stable-diffusion-webui-forge), which implements [IC-Light](https://github.com/lllyasviel/IC-Light), allowing you to manipulate the illumination of images.
 
-## Install
-### SD Forge
-![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/608fbe20-1430-4efa-93bc-166f629eaaa5)
-### A1111
-- Install https://github.com/huchenlei/sd-webui-model-patcher first as it provides the `ModelPatcher` interface.
-- Install the extension the same way as SD Forge
-- [**Known issue**]: HR does not workn for A1111 yet.
+> This only works with SD 1.5 checkpoints
 
-### Download models
-IC-Light main repo is based on diffusers. In order to load it with UnetLoader in Forge, state_dict keys need to convert to ldm format. You can download models with ldm keys here: https://huggingface.co/huchenlei/IC-Light-ldm/tree/main
+> Now supports [Automatic1111 Webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui)[*](#getting-started)
 
-There are 2 models:
-- iclight_sd15_fc_unet_ldm: Use this in FG workflows
-- iclight_sd15_fbc_unet_ldm: Use this in BG workflows
-
-After you download these models, please put them under `stable-diffusion-webui-forge/models/unet`. You might want to manually create the `unet` folder.
+## Getting Started
+0. For **Automatic1111**, install [sd-webui-model-patcher](https://github.com/huchenlei/sd-webui-model-patcher) first
+1. Download the <ins>two</ins> models from [Releases](https://github.com/Haoming02/sd-forge-ic-light/releases)
+2. Create a new folder, `ic-light`, inside your webui `models` folder
+3. Place the 2 models inside the said folder
+4. **(Optional)** You can rename the models, as long as the filenames contain either **`fc`** or **`fbc`**
 
 ## How to use
-For best result, it is recommended to use low CFG and strong denosing strength.
+To get the best result, it is recommended to use low CFG (2.0) and strong denoising strength.
 
 ### Given FG, Generate BG and relight [Txt2Img][HR available]
 ![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/00fbae46-b5cf-4415-89ac-5b23b1a8f463)
 
 ### Given FG and light map, Genereate BG and relight [Img2Img]
-After you select value from the radio, the img2img input will automatically be set by the extension. 
+After you select the value from the radio, the img2img input will automatically be set by the extension.
 ![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/1b9e9c87-e8ef-4505-ab04-ade37336a8a3)
 ![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/618ba4d4-5df7-4084-bdf1-44927f77a581)
 ![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/899bf635-1aac-40e5-bf4f-ca801e7922d5)
@@ -40,6 +34,13 @@ and uncheck the remove bg checkbox.
 ![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/fc6c583e-9de5-4555-ac36-48ca3f47fce7)
 ![image](https://github.com/huchenlei/sd-forge-ic-light/assets/20929282/dbf24894-2cfe-4d61-9529-9d2620380f0d)
 
-## TODOs
+## [2024-06-06] Major Update Release Note
 
-- Add infotext support
+- Load models from `ic-light` folder with arbitrary filenames. You need to rename your `unet` folder to `ic-light`.Use the pre-built `rembg` package instead of diffusers version.
+- **New Feature:** Implement *Difference of Gaussians* to reintroduce some details, e.g. text, after the processing.
+- **New Feature:** Implement reinforce-fg option which allows better preservation of fg base color.
+
+## Known Issue
+
+- For **Automatic1111** implementation, **Hires. Fix** is not supported yet. This is caused by A1111 code structure, which is hard to modify. We might want to make our own fork of A1111 later to make it work, as PR is not likely to get merged in A1111 repo.
+- `Restore Details` does not work properly when the input and output aspect ratios are different
