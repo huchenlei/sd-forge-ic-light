@@ -64,12 +64,13 @@ def apply_ic_light(
         return new_forward
 
     # Patch unet forward.
-    p.model_patcher.add_module_patch(
+    model_patcher = p.get_model_patcher()
+    model_patcher.add_module_patch(
         "diffusion_model", ModulePatch(create_new_forward_func=apply_c_concat)
     )
 
     # Patch weights.
-    p.model_patcher.add_patches(
+    model_patcher.add_patches(
         patches={
             "diffusion_model." + key: (value.to(dtype=dtype, device=device),)
             for key, value in ic_model_state_dict.items()

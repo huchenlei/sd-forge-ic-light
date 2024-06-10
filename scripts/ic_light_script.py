@@ -155,10 +155,12 @@ class ICLightScript(scripts.Script):
                 interactive=True,
             )
 
-            with InputAccordion(value=False, label="Restore Details") as detail_transfer:
+            with InputAccordion(
+                value=False, label="Restore Details"
+            ) as detail_transfer:
 
                 detail_transfer_use_raw_input = gr.Checkbox(
-                    label="Use the [Original Input] instead of the [Image with Background Removed]"
+                    label="Use the [Image with Background Removed] instead of the [Original Input]"
                 )
 
                 detail_transfer_blur_radius = gr.Slider(
@@ -264,28 +266,13 @@ class ICLightScript(scripts.Script):
 
         self.args = args
 
-    def process(self, p: StableDiffusionProcessing, *args, **kwargs):
-        """A1111 impl."""
-        if self.backend_type != BackendType.A1111:
-            return
-
-        if (self.args is None) or (not self.args.enabled):
-            return
-
-        if isinstance(p, StableDiffusionProcessingTxt2Img) and getattr(
-            p, "enable_hr", False
-        ):
-            raise NotImplementedError("Hires-fix is not yet supported in A1111.")
-
-        self.apply_ic_light(p, self.args)
-
     def process_before_every_sampling(
         self, p: StableDiffusionProcessing, *args, **kwargs
     ):
-        """Forge impl."""
-        if self.backend_type == BackendType.A1111:
-            return
-
+        """
+        Similar to process(), called before every sampling.
+        If you use high-res fix, this will be called twice.
+        """
         if (self.args is None) or (not self.args.enabled):
             return
 
