@@ -155,12 +155,10 @@ class ICLightScript(scripts.Script):
                 interactive=True,
             )
 
-            with InputAccordion(
-                value=False, label="Restore Details"
-            ) as detail_transfer:
+            with InputAccordion(value=False, label="Restore Details") as detail_transfer:
 
                 detail_transfer_use_raw_input = gr.Checkbox(
-                    label="Use the [Image with Background Removed] instead of the [Original Input]"
+                    label="Use the [Original Input] instead of the [Image with Background Removed]"
                 )
 
                 detail_transfer_blur_radius = gr.Slider(
