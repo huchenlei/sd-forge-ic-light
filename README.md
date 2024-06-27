@@ -93,5 +93,4 @@ If the default remove bg cannot achieve your desired effect, you can use other t
 
 ## Known Issue
 
-- For **Automatic1111** implementation, **Hires. Fix** is not supported yet. This is caused by A1111 code structure, which is hard to modify. We might want to make our own fork of A1111 later to make it work, as PR is not likely to get merged in A1111 repo.
 - `Restore Details` does not work properly when the input and output aspect ratios are different
