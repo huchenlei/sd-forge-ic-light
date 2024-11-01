@@ -1,9 +1,15 @@
-# SD Forge IC-Light
-This is an Extension for the [Forge Webui](https://github.com/lllyasviel/stable-diffusion-webui-forge), which implements [IC-Light](https://github.com/lllyasviel/IC-Light), allowing you to manipulate the illumination of images.
+> [!IMPORTANT]
+> This Repository is no longer maintained *(see this [comment](https://github.com/huchenlei/sd-forge-ic-light/issues/39#issuecomment-2298721608))*. Recommend using the up-to-date [Fork](https://github.com/Haoming02/sd-forge-ic-light) instead.
 
-> This only works with SD 1.5 checkpoints
+# sd-forge-ic-light
+A1111/SD Forge extension for [IC-Light](https://github.com/lllyasviel/IC-Light). Forge backend is based on https://github.com/huchenlei/ComfyUI-IC-Light-Native.
 
-> Now supports [Automatic1111 Webui](https://github.com/AUTOMATIC1111/stable-diffusion-webui)[*](#getting-started)
+## [2024-06-06] Major Update [PR [#24](https://github.com/huchenlei/sd-forge-ic-light/pull/24)]
+
+- Load models from `ic-light` folder with arbitrary filenames. You need to rename your `unet` folder to `ic-light`.
+- Use the pre-built `rembg` package instead of diffusers version.
+- **New Feature:** Implement *Difference of Gaussians* to reintroduce some details, e.g. text, after the processing.
+- **New Feature:** Implement reinforce-fg option which allows better preservation of fg base color.
 
 ## Getting Started
 0. For **Automatic1111**, install [sd-webui-model-patcher](https://github.com/huchenlei/sd-webui-model-patcher) first
@@ -11,13 +17,6 @@ This is an Extension for the [Forge Webui](https://github.com/lllyasviel/stable-
 2. Create a new folder, `ic-light`, inside your webui `models` folder
 3. Place the 2 models inside the said folder
 4. **(Optional)** You can rename the models, as long as the filenames contain either **`fc`** or **`fbc`**
-
-## [2024-06-06] Major Update Release Note [PR https://github.com/huchenlei/sd-forge-ic-light/pull/24]
-
-- Load models from `ic-light` folder with arbitrary filenames. You need to rename your `unet` folder to `ic-light`.
-- Use the pre-built `rembg` package instead of diffusers version.
-- **New Feature:** Implement *Difference of Gaussians* to reintroduce some details, e.g. text, after the processing.
-- **New Feature:** Implement reinforce-fg option which allows better preservation of fg base color.
 
 ## How to use
 For best result, it is recommended to use low CFG and strong denosing strength.
